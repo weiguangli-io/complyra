@@ -16,6 +16,10 @@ fi
 
 cd "$TF_DIR"
 
+# Prevent flaky provider startup timeouts on slower local environments.
+: "${TF_PLUGIN_TIMEOUT:=120s}"
+export TF_PLUGIN_TIMEOUT
+
 if [ ! -f terraform.tfvars ] && [ -f terraform.tfvars.example ]; then
   cp terraform.tfvars.example terraform.tfvars
   echo "Created terraform.tfvars from example. Review it before apply."

@@ -83,6 +83,7 @@ output "jwt_secret_arn" {
 output "sentry_secret_arn" {
   description = "Secrets Manager ARN for Sentry DSN if configured"
   value       = var.app_sentry_dsn != "" ? aws_secretsmanager_secret.sentry[0].arn : null
+  sensitive   = true
 }
 
 output "synthetics_canary_name" {
