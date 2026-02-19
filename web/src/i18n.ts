@@ -1,0 +1,319 @@
+export type Locale = "en" | "zh";
+
+type Primitive = string | number;
+type MessageValue = string | ((params: Record<string, Primitive>) => string);
+type Dictionary = Record<string, MessageValue>;
+
+const messages: Record<Locale, Dictionary> = {
+  en: {
+    "lang.en": "EN",
+    "lang.zh": "中文",
+    "lang.switch": "Switch language",
+    "skip.main": "Skip to main content",
+
+    "status.ready": "Ready. Sign in to start.",
+    "status.signingIn": "Signing in...",
+    "status.custom": ({ text }) => String(text),
+    "status.loginFailed": "Login failed. Check credentials or service health.",
+    "status.signedIn": ({ role }) => `Signed in as ${role}.`,
+    "status.signedOut": "Signed out.",
+
+    "status.ingestSubmitting": "Submitting ingest job...",
+    "status.ingestQueued": ({ jobId }) => `Ingest queued: ${jobId}`,
+    "status.ingestCompleted": ({ count }) => `Ingest completed. Indexed ${count} chunks.`,
+    "status.ingestFailed": ({ reason }) => `Ingest failed: ${reason}`,
+    "status.ingestRunning": "Ingest is still running. Check job status again later.",
+    "status.ingestSubmitFailed": "Failed to submit ingest job.",
+
+    "status.retrievalRunning": "Running retrieval...",
+    "status.approvalRequired": "Approval required. Waiting for reviewer decision.",
+    "status.answerReady": "Answer ready.",
+    "status.chatFailed": "Chat request failed.",
+
+    "status.approvalCompleted": "Approval completed and final answer is now available.",
+    "status.approvalRejected": "Approval rejected.",
+    "status.approvalPending": "Approval is still pending.",
+    "status.approvalFetchFailed": "Failed to fetch approval result.",
+
+    "status.auditLoaded": ({ count }) => `Loaded ${count} audit entries.`,
+    "status.auditLoadFailed": "Failed to load audit logs.",
+
+    "status.approvalsLoaded": ({ count }) => `Loaded ${count} pending approvals.`,
+    "status.approvalsLoadFailed": "Failed to load approvals.",
+    "status.approvalAccepted": "Approval accepted.",
+    "status.approvalDecisionFailed": "Decision failed.",
+
+    "status.tenantsLoaded": ({ count }) => `Loaded ${count} tenants.`,
+    "status.tenantsLoadFailed": "Failed to load tenants.",
+    "status.tenantCreated": "Tenant created.",
+    "status.tenantCreateFailed": "Failed to create tenant.",
+
+    "status.usersLoaded": ({ count }) => `Loaded ${count} users.`,
+    "status.usersLoadFailed": "Failed to load users.",
+    "status.userCreated": "User created.",
+    "status.userCreateFailed": "Failed to create user.",
+    "status.tenantAssigned": "Tenant assigned to user.",
+    "status.tenantAssignFailed": "Tenant assignment failed.",
+
+    "hero.eyebrow": "Complyra Control Surface",
+    "hero.title": "Governed AI Ops for compliance-critical knowledge flows.",
+    "hero.desc": "Purpose-built for enterprise RAG: secure tenant isolation, approval workflows, auditable trails, and policy-aware generation.",
+    "hero.tag.rbac": "RBAC",
+    "hero.tag.multitenant": "Multi-tenant",
+    "hero.tag.approval": "Human approval",
+    "hero.tag.audit": "Audit trail",
+
+    "auth.guest": "Guest session",
+    "auth.as": ({ role }) => `Authenticated as ${role}`,
+
+    "metrics.pendingApprovals": "Pending approvals",
+    "metrics.auditEvents": "Audit events",
+    "metrics.tenants": "Tenants",
+    "metrics.users": "Users",
+
+    "session.title": "Session",
+    "session.username": "Username",
+    "session.password": "Password",
+    "session.tenantScope": "Tenant Scope",
+    "session.signIn": "Sign in",
+    "session.signingIn": "Signing in...",
+    "session.signOut": "Sign out",
+
+    "workspace.title": "Workspace",
+    "panel.workbench": "AI Workbench",
+    "panel.workbenchDesc": "Ingest + ask + review",
+    "panel.approvals": "Approvals",
+    "panel.approvalsDesc": "Human review queue",
+    "panel.audit": "Audit",
+    "panel.auditDesc": "Traceable event logs",
+    "panel.admin": "Admin",
+    "panel.adminDesc": "Tenants and users",
+
+    "workbench.ingestTitle": "Ingest documents",
+    "workbench.ingestDesc": "Admins can queue and monitor ingestion jobs.",
+    "workbench.document": "Document",
+    "workbench.submitIngest": "Submit ingest job",
+    "workbench.submitting": "Submitting...",
+    "workbench.adminRequiredIngest": "Admin role required for ingestion actions.",
+    "workbench.job": "Job",
+    "workbench.jobStatus": "Status",
+
+    "workbench.askTitle": "Ask assistant",
+    "workbench.askDesc": "Tenant-scoped retrieval and governed response generation.",
+    "workbench.question": "Question",
+    "workbench.questionPlaceholder": "Ask policy, controls, or process questions...",
+    "workbench.runQuery": "Run query",
+    "workbench.thinking": "Thinking...",
+    "workbench.refreshApproval": "Refresh approval",
+    "workbench.approvalId": "Approval ID",
+
+    "workbench.responseTitle": "Response",
+    "workbench.noAnswer": "No answer yet.",
+    "workbench.noChunks": "No retrieval chunks yet.",
+    "workbench.pendingApprovalAnswer": "Answer is pending approval.",
+    "workbench.rejectedAnswer": "The request was rejected by a reviewer.",
+
+    "approvals.title": "Approval queue",
+    "approvals.desc": "Review generated answers before release.",
+    "approvals.refresh": "Refresh queue",
+    "approvals.note": "Decision note",
+    "approvals.noPermission": "Admin or auditor role required to decide approvals.",
+    "approvals.empty": "No pending approvals.",
+    "approvals.question": "Question",
+    "approvals.draft": "Draft",
+    "approvals.approve": "Approve",
+    "approvals.reject": "Reject",
+
+    "audit.title": "Audit trail",
+    "audit.desc": "Tenant-aware immutable record stream.",
+    "audit.refresh": "Refresh logs",
+    "audit.empty": "No logs loaded yet.",
+    "audit.time": "Time",
+    "audit.tenant": "Tenant",
+    "audit.user": "User",
+    "audit.action": "Action",
+    "audit.input": "Input",
+
+    "admin.title": "Admin console",
+    "admin.noPermission": "Admin role required for user and tenant management.",
+    "admin.tenants": "Tenants",
+    "admin.load": "Load",
+    "admin.newTenant": "New tenant name",
+    "admin.createTenant": "Create tenant",
+    "admin.users": "Users",
+    "admin.newUser": "Username",
+    "admin.newPassword": "Password",
+    "admin.role": "Role",
+    "admin.defaultTenant": "Default tenant",
+    "admin.createUser": "Create user",
+    "admin.assignUserId": "Assign tenant: user ID",
+    "admin.assignTenantId": "Assign tenant: tenant ID",
+    "admin.assignTenant": "Assign tenant",
+    "admin.noTenants": "no tenants"
+  },
+  zh: {
+    "lang.en": "EN",
+    "lang.zh": "中文",
+    "lang.switch": "切换语言",
+    "skip.main": "跳转到主内容",
+
+    "status.ready": "系统就绪，请先登录。",
+    "status.signingIn": "正在登录...",
+    "status.custom": ({ text }) => String(text),
+    "status.loginFailed": "登录失败，请检查账号或服务状态。",
+    "status.signedIn": ({ role }) => `已登录，角色：${role}。`,
+    "status.signedOut": "已退出登录。",
+
+    "status.ingestSubmitting": "正在提交入库任务...",
+    "status.ingestQueued": ({ jobId }) => `入库任务已排队：${jobId}`,
+    "status.ingestCompleted": ({ count }) => `入库完成，已索引 ${count} 个分块。`,
+    "status.ingestFailed": ({ reason }) => `入库失败：${reason}`,
+    "status.ingestRunning": "入库仍在进行中，请稍后查看任务状态。",
+    "status.ingestSubmitFailed": "提交入库任务失败。",
+
+    "status.retrievalRunning": "正在执行检索...",
+    "status.approvalRequired": "回答需要审批，等待审核人决策。",
+    "status.answerReady": "回答已生成。",
+    "status.chatFailed": "对话请求失败。",
+
+    "status.approvalCompleted": "审批已完成，最终回答可用。",
+    "status.approvalRejected": "审批已拒绝。",
+    "status.approvalPending": "审批仍在处理中。",
+    "status.approvalFetchFailed": "获取审批结果失败。",
+
+    "status.auditLoaded": ({ count }) => `已加载 ${count} 条审计日志。`,
+    "status.auditLoadFailed": "加载审计日志失败。",
+
+    "status.approvalsLoaded": ({ count }) => `已加载 ${count} 条待审批记录。`,
+    "status.approvalsLoadFailed": "加载审批队列失败。",
+    "status.approvalAccepted": "已通过审批。",
+    "status.approvalDecisionFailed": "审批决策失败。",
+
+    "status.tenantsLoaded": ({ count }) => `已加载 ${count} 个租户。`,
+    "status.tenantsLoadFailed": "加载租户失败。",
+    "status.tenantCreated": "租户创建成功。",
+    "status.tenantCreateFailed": "创建租户失败。",
+
+    "status.usersLoaded": ({ count }) => `已加载 ${count} 个用户。`,
+    "status.usersLoadFailed": "加载用户失败。",
+    "status.userCreated": "用户创建成功。",
+    "status.userCreateFailed": "创建用户失败。",
+    "status.tenantAssigned": "租户分配成功。",
+    "status.tenantAssignFailed": "租户分配失败。",
+
+    "hero.eyebrow": "Complyra 控制台",
+    "hero.title": "面向合规场景的可治理 AI 运营平台。",
+    "hero.desc": "为企业级 RAG 设计：安全的租户隔离、人工审批流程、可审计链路和策略感知生成。",
+    "hero.tag.rbac": "RBAC",
+    "hero.tag.multitenant": "多租户",
+    "hero.tag.approval": "人工审批",
+    "hero.tag.audit": "审计追踪",
+
+    "auth.guest": "访客会话",
+    "auth.as": ({ role }) => `当前已认证：${role}`,
+
+    "metrics.pendingApprovals": "待审批",
+    "metrics.auditEvents": "审计事件",
+    "metrics.tenants": "租户数",
+    "metrics.users": "用户数",
+
+    "session.title": "会话",
+    "session.username": "用户名",
+    "session.password": "密码",
+    "session.tenantScope": "租户范围",
+    "session.signIn": "登录",
+    "session.signingIn": "登录中...",
+    "session.signOut": "退出",
+
+    "workspace.title": "工作区",
+    "panel.workbench": "AI 工作台",
+    "panel.workbenchDesc": "入库 + 提问 + 复核",
+    "panel.approvals": "审批",
+    "panel.approvalsDesc": "人工审核队列",
+    "panel.audit": "审计",
+    "panel.auditDesc": "可追踪事件日志",
+    "panel.admin": "管理",
+    "panel.adminDesc": "租户与用户",
+
+    "workbench.ingestTitle": "文档入库",
+    "workbench.ingestDesc": "管理员可提交并监控入库任务。",
+    "workbench.document": "文档",
+    "workbench.submitIngest": "提交入库任务",
+    "workbench.submitting": "提交中...",
+    "workbench.adminRequiredIngest": "入库操作需要管理员角色。",
+    "workbench.job": "任务",
+    "workbench.jobStatus": "状态",
+
+    "workbench.askTitle": "提问助手",
+    "workbench.askDesc": "基于租户隔离的检索与受控回答生成。",
+    "workbench.question": "问题",
+    "workbench.questionPlaceholder": "请输入关于政策、控制项或流程的问题...",
+    "workbench.runQuery": "执行查询",
+    "workbench.thinking": "生成中...",
+    "workbench.refreshApproval": "刷新审批",
+    "workbench.approvalId": "审批 ID",
+
+    "workbench.responseTitle": "回答",
+    "workbench.noAnswer": "暂无回答。",
+    "workbench.noChunks": "暂无检索片段。",
+    "workbench.pendingApprovalAnswer": "回答正在等待审批。",
+    "workbench.rejectedAnswer": "该请求已被审核人拒绝。",
+
+    "approvals.title": "审批队列",
+    "approvals.desc": "发布前对生成回答进行人工审核。",
+    "approvals.refresh": "刷新队列",
+    "approvals.note": "审批备注",
+    "approvals.noPermission": "审批操作需要 admin 或 auditor 角色。",
+    "approvals.empty": "当前没有待审批项。",
+    "approvals.question": "问题",
+    "approvals.draft": "草稿",
+    "approvals.approve": "通过",
+    "approvals.reject": "拒绝",
+
+    "audit.title": "审计追踪",
+    "audit.desc": "租户级不可篡改的事件记录流。",
+    "audit.refresh": "刷新日志",
+    "audit.empty": "尚未加载日志。",
+    "audit.time": "时间",
+    "audit.tenant": "租户",
+    "audit.user": "用户",
+    "audit.action": "动作",
+    "audit.input": "输入",
+
+    "admin.title": "管理控制台",
+    "admin.noPermission": "用户与租户管理需要管理员角色。",
+    "admin.tenants": "租户",
+    "admin.load": "加载",
+    "admin.newTenant": "新租户名称",
+    "admin.createTenant": "创建租户",
+    "admin.users": "用户",
+    "admin.newUser": "用户名",
+    "admin.newPassword": "密码",
+    "admin.role": "角色",
+    "admin.defaultTenant": "默认租户",
+    "admin.createUser": "创建用户",
+    "admin.assignUserId": "分配租户：用户 ID",
+    "admin.assignTenantId": "分配租户：租户 ID",
+    "admin.assignTenant": "分配租户",
+    "admin.noTenants": "无租户"
+  }
+};
+
+export const detectLocale = (): Locale => {
+  if (typeof navigator === "undefined") {
+    return "en";
+  }
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+};
+
+export const t = (
+  locale: Locale,
+  key: string,
+  params: Record<string, Primitive> = {}
+): string => {
+  const localized = messages[locale][key] ?? messages.en[key] ?? key;
+  if (typeof localized === "function") {
+    return localized(params);
+  }
+  return localized;
+};

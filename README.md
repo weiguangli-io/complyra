@@ -124,6 +124,14 @@ cp .env.example .env
 npm run dev
 ```
 
+Frontend quality checks:
+
+```bash
+cd /Users/liweiguang/aiagent/complyra/web
+npm run build
+npm run test:e2e
+```
+
 ## Production Deployment (AWS)
 
 Recommended order:
@@ -157,6 +165,9 @@ Detailed runbook: `docs/aws-deployment.md`
 - Release and rollback: `docs/release-and-rollback.md`
 - Operations runbook: `docs/operations-runbook.md`
 - Optimization roadmap: `docs/optimization-roadmap.md`
+- Frontend contribution guide: `docs/frontend-contributing.md`
+- UI design tokens: `docs/ui-design-tokens.md`
+- Frontend package readme: `web/README.md`
 - Terraform/IaC guide: `infra/terraform/README.md`
 
 ## Verification
@@ -166,7 +177,7 @@ cd /Users/liweiguang/aiagent/complyra
 python3 -m compileall app
 PYTHONPATH=. .venv/bin/pytest -q tests
 ./scripts/iac/01_conftest_check.sh
-cd web && npm run build
+cd web && npm run build && npm run test:e2e
 ```
 
 ## License

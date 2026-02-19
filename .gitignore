@@ -36,3 +36,8 @@ infra/terraform/login_chat_approval.zip
 .DS_Store
 .vscode/
 .idea/
+
+# Playwright artifacts
+web/playwright-report/
+web/test-results/
+output/
