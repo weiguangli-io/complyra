@@ -20,6 +20,13 @@ cd "$TF_DIR"
 : "${TF_PLUGIN_TIMEOUT:=120s}"
 export TF_PLUGIN_TIMEOUT
 
+# On local machines without explicit AWS credentials/profile, skip IMDS lookup
+# to avoid long fallback waits and confusing provider startup timeouts.
+if [ -z "${AWS_ACCESS_KEY_ID:-}" ] && [ -z "${AWS_PROFILE:-}" ]; then
+  : "${AWS_EC2_METADATA_DISABLED:=true}"
+  export AWS_EC2_METADATA_DISABLED
+fi
+
 if [ ! -f terraform.tfvars ] && [ -f terraform.tfvars.example ]; then
   cp terraform.tfvars.example terraform.tfvars
   echo "Created terraform.tfvars from example. Review it before apply."
