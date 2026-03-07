@@ -1,10 +1,10 @@
 # Complyra
 
-[![CI](https://github.com/complyra/complyra/actions/workflows/ci.yml/badge.svg)](https://github.com/complyra/complyra/actions/workflows/ci.yml)
+[![CI](https://github.com/OiPunk/complyra/actions/workflows/ci.yml/badge.svg)](https://github.com/OiPunk/complyra/actions/workflows/ci.yml)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**Production-grade enterprise RAG assistant with governed AI responses.**
+> **Complyra** = **Comply** + **RA**(G) — Enterprise compliance knowledge assistant powered by Retrieval-Augmented Generation.
 
 Complyra combines multi-tenant retrieval-augmented generation, human-in-the-loop approval workflow, RBAC, full audit logging, and cloud-ready deployment automation — built for compliance-sensitive environments.
 
