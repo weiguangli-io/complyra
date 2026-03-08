@@ -67,3 +67,19 @@ class TestCreateApp:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/metrics", headers={"X-Metrics-Token": "secret"})
         assert resp.status_code == 200
+
+
+class TestAppLifespan:
+    @patch("app.main.setup_logging")
+    def test_lifespan_model_pull_failure_logs_warning(self, mock_logging, monkeypatch, caplog):
+        monkeypatch.setattr("app.main.settings.trusted_hosts", ["*"])
+
+        with patch("app.main.ensure_model_ready", return_value=False) as mock_model, \
+             patch("app.main.init_db"), \
+             patch("app.main.ensure_default_seed"):
+            import logging
+            with caplog.at_level(logging.WARNING):
+                app = create_app()
+                with TestClient(app, raise_server_exceptions=False):
+                    pass  # lifespan runs on enter
+            assert mock_model.called

@@ -807,6 +807,162 @@ input[type="checkbox"] {
   color: var(--ink-3);
 }
 
+/* Citation metadata row */
+.citation-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.citation-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.citation-source svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.6;
+}
+
+.citation-pages {
+  display: inline-flex;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--bg-hover);
+  border: 1px solid var(--line-light);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Relevance bar */
+.relevance-bar-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.relevance-bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.relevance-bar {
+  width: 60px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--line-light);
+  overflow: hidden;
+}
+
+.relevance-bar-fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--c-pri);
+  transition: width 0.3s ease;
+}
+
+/* Query rewrite indicator */
+.query-rewrite {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--c-pri-soft);
+  border: 1px solid var(--c-pri-border);
+  font-size: 12px;
+  color: var(--ink-2);
+  animation: fade-in 0.28s ease both;
+}
+
+.query-rewrite svg {
+  width: 14px;
+  height: 14px;
+  color: var(--c-pri);
+  flex-shrink: 0;
+}
+
+.query-rewrite strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.judge-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--c-ok-soft);
+  border: 1px solid var(--c-ok-border);
+  font-size: 11px;
+  font-weight: 600;
+  color: #059669;
+  margin-left: 8px;
+}
+
+/* Document list in admin */
+.doc-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.doc-item {
+  padding: 10px 12px;
+  border: 1px solid var(--line-light);
+  border-radius: var(--r-md);
+  background: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: border-color 0.12s ease;
+}
+
+.doc-item:hover {
+  border-color: var(--line);
+}
+
+.doc-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-item-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 1px;
+}
+
+.doc-item .btn-danger.btn-sm {
+  flex-shrink: 0;
+}
+
 /* ── Approval List ──────────────────────────────────────────── */
 .approval-list {
   display: grid;

@@ -60,6 +60,13 @@ class Settings(BaseSettings):
     ollama_prepull: bool = True
     ollama_timeout_seconds: int = 60
 
+    # ── Query Rewrite ──────────────────────────────────────────────
+    query_rewrite_enabled: bool = True
+
+    # ── ReAct Retrieval ────────────────────────────────────────────
+    react_retrieval_enabled: bool = True
+    max_retrieval_attempts: int = 3
+
     # ── RAG Parameters ─────────────────────────────────────────────
     chunk_size: int = 800
     chunk_overlap: int = 120
@@ -109,7 +116,19 @@ class Settings(BaseSettings):
     ingest_async_enabled: bool = True
     ingest_max_file_size_mb: int = 20
     ingest_storage_path: str = "./data/uploads"
-    ingest_allowed_extensions: list[str] = ["pdf", "txt", "md"]
+    ingest_allowed_extensions: list[str] = ["pdf", "txt", "md", "png", "jpg", "jpeg"]
+
+    # ── OCR ─────────────────────────────────────────────────────────
+    ocr_enabled: bool = True
+    ocr_language: str = "eng+chi_sim"
+    ocr_min_text_threshold: int = 50
+    chunking_strategy: str = "smart"  # "smart" | "fixed"
+
+    # ── Hybrid Search ──────────────────────────────────────────────
+    hybrid_search_enabled: bool = True
+
+    # ── Multimodal ─────────────────────────────────────────────────
+    multimodal_enabled: bool = False
 
     model_config = SettingsConfigDict(
         env_prefix="APP_",

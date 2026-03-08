@@ -7,13 +7,17 @@ and Google Gemini as backends via ``APP_LLM_PROVIDER``.
 
 from __future__ import annotations
 
+import base64
 import json
+import logging
 from typing import AsyncIterator, List
 
 import httpx
 from langsmith import traceable
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _build_prompt(question: str, contexts: List[str], sources: List[str] | None = None) -> str:
@@ -159,6 +163,64 @@ async def _generate_gemini_stream(
                         text = part.get("text", "")
                         if text:
                             yield text
+
+
+# ── Multimodal (Gemini Vision) ─────────────────────────────────
+
+
+def describe_image(image_bytes: bytes) -> str:
+    """Describe image content using Gemini's multimodal API.
+
+    Extracts text, describes charts/diagrams, and provides detailed
+    descriptions of image content for indexing.
+
+    Args:
+        image_bytes: Raw image bytes (PNG, JPEG, etc.).
+
+    Returns:
+        Text description of the image content.
+    """
+    if not settings.gemini_api_key:
+        logger.warning("Gemini API key not configured; skipping image description")
+        return ""
+
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    url = (
+        f"{_GEMINI_API_BASE}/{settings.gemini_chat_model}:generateContent"
+        f"?key={settings.gemini_api_key}"
+    )
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": (
+                            "Describe the content of this image in detail. "
+                            "If it contains text, extract all text. "
+                            "If it's a chart or diagram, describe the data "
+                            "and relationships shown."
+                        )
+                    },
+                    {
+                        "inline_data": {
+                            "mime_type": "image/png",
+                            "data": image_b64,
+                        }
+                    },
+                ]
+            }
+        ],
+        "generationConfig": {"temperature": 0.2},
+    }
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception:
+        logger.exception("Failed to describe image via Gemini Vision")
+        return ""
 
 
 # ── Public API ──────────────────────────────────────────────────

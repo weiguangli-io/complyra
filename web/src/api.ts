@@ -3,6 +3,7 @@ import type {
   ApprovalResponse,
   AuditRecord,
   ChatResponse,
+  DocumentInfo,
   IngestJobResponse,
   IngestSubmitResponse,
   Tenant,
@@ -166,6 +167,22 @@ export async function assignUserTenant(userId: string, tenantId: string, token?:
   );
 }
 
+export async function listDocuments(tenantId: string, token?: string | null): Promise<DocumentInfo[]> {
+  const response = await client.get<DocumentInfo[]>("/documents/", {
+    headers: {
+      ...authHeaders(token),
+      "X-Tenant-ID": tenantId
+    }
+  });
+  return response.data;
+}
+
+export async function deleteDocument(documentId: string, token?: string | null): Promise<void> {
+  await client.delete(`/documents/${documentId}`, {
+    headers: authHeaders(token)
+  });
+}
+
 /**
  * Stream chat via SSE. Returns an AbortController to cancel the stream.
  */
@@ -180,9 +197,9 @@ export function chatStream(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...authHeaders(token),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       "X-Tenant-ID": tenantId,
-    },
+    } as Record<string, string>,
     body: JSON.stringify({ question }),
     signal: controller.signal,
   }).then(async (res) => {

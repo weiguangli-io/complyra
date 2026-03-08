@@ -650,8 +650,8 @@ resource "aws_ecs_task_definition" "qdrant" {
   family                   = "${local.name_prefix}-qdrant"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "512"
+  memory                   = "1024"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
@@ -703,9 +703,9 @@ resource "aws_ecs_task_definition" "qdrant" {
       healthCheck = {
         command     = ["CMD-SHELL", "wget -qO- http://127.0.0.1:6333/healthz || exit 1"]
         interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 15
+        timeout     = 10
+        retries     = 5
+        startPeriod = 60
       }
     }
   ])

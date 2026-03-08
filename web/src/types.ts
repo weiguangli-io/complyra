@@ -27,6 +27,14 @@ export type RetrievedChunk = {
   text: string;
   score: number;
   source?: string | null;
+  page_numbers?: number[] | null;
+};
+
+export type DocumentInfo = {
+  document_id: string;
+  filename: string;
+  chunk_count: number;
+  created_at: string;
 };
 
 export type ChatResponse = {

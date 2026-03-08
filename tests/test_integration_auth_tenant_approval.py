@@ -43,7 +43,7 @@ def test_approval_workflow_with_tenant_and_user_isolation(monkeypatch) -> None:
             "question": question,
             "tenant_id": tenant_id,
             "user_id": user_id,
-            "retrieved": [("mock-context", 0.99, "mock-source")],
+            "retrieved": [("mock-context", 0.99, "mock-source", [1])],
             "draft_answer": "mock-draft",
             "approval_required": True,
             "approval_id": approval_id,

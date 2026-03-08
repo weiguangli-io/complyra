@@ -37,6 +37,7 @@ def mock_qdrant(monkeypatch):
         "text": "mocked chunk text",
         "source": "test.pdf",
         "tenant_id": "default",
+        "page_numbers": [1],
     }
     mock_client.search.return_value = [mock_search_result]
 

@@ -6,11 +6,13 @@ import {
   createTenant,
   createUser,
   decideApproval,
+  deleteDocument,
   fetchApprovals,
   fetchAudit,
   getApprovalResult,
   getIngestJob,
   ingestFile,
+  listDocuments,
   listTenants,
   listUsers,
   login,
@@ -20,6 +22,7 @@ import { detectLocale, type Locale, t } from "./i18n";
 import type {
   ApprovalResponse,
   AuditRecord,
+  DocumentInfo,
   IngestJobResponse,
   RetrievedChunk,
   Tenant,
@@ -80,7 +83,7 @@ const IconLogo = () => (
   </svg>
 );
 
-const NAV_ICONS: Record<Panel, () => JSX.Element> = {
+const NAV_ICONS: Record<Panel, () => React.ReactElement> = {
   workbench: IconChat,
   approvals: IconShield,
   audit: IconClipboard,
@@ -126,6 +129,10 @@ export default function App() {
   const [newUserDefaultTenant, setNewUserDefaultTenant] = useState("");
   const [assignUserId, setAssignUserId] = useState("");
   const [assignTenantId, setAssignTenantId] = useState("");
+
+  const [documents, setDocuments] = useState<DocumentInfo[]>([]);
+  const [rewrittenQuery, setRewrittenQuery] = useState<string | null>(null);
+  const [judgeCompleted, setJudgeCompleted] = useState(false);
 
   const isAuthenticated = useMemo(() => Boolean(token), [token]);
   const isAdmin = role === "admin";
@@ -225,6 +232,8 @@ export default function App() {
     if (!question || !isAuthenticated) return;
     await runAction("ask", async () => {
       try {
+        setRewrittenQuery(null);
+        setJudgeCompleted(false);
         setStatus({ key: "status.retrievalRunning" });
         const result = await askQuestion(question, tenantId, token);
         setRetrieved(result.retrieved);
@@ -251,16 +260,24 @@ export default function App() {
     setAnswer("");
     setRetrieved([]);
     setApprovalId(null);
+    setRewrittenQuery(null);
+    setJudgeCompleted(false);
     setBusyAction("ask");
     setStatus({ key: "status.retrievalRunning" });
 
     let accumulated = "";
     const controller = chatStream(question, tenantId, token, (event, data) => {
       switch (event) {
+        case "rewrite_done":
+          setRewrittenQuery((data.rewritten_query as string) || null);
+          break;
+        case "judge_done":
+          setJudgeCompleted(true);
+          break;
         case "retrieve_done":
           setRetrieved(
-            ((data.retrieved as Array<{ text: string; score: number; source: string }>) || []).map(
-              (r) => ({ text: r.text, score: r.score, source: r.source })
+            ((data.retrieved as Array<{ text: string; score: number; source: string; page_numbers?: number[] }>) || []).map(
+              (r) => ({ text: r.text, score: r.score, source: r.source, page_numbers: r.page_numbers })
             )
           );
           setStatus({ key: "status.retrievalRunning" });
@@ -438,6 +455,36 @@ export default function App() {
       } catch (error) {
         console.error(error);
         setStatus({ key: "status.tenantAssignFailed" });
+      }
+    });
+  };
+
+  const handleLoadDocuments = async () => {
+    if (!isAuthenticated || !isAdmin) return;
+    await runAction("documents", async () => {
+      try {
+        const result = await listDocuments(tenantId, token);
+        setDocuments(result);
+        setStatus({ key: "status.docsLoaded", params: { count: result.length } });
+      } catch (error) {
+        console.error(error);
+        setStatus({ key: "status.docsLoadFailed" });
+      }
+    });
+  };
+
+  const handleDeleteDocument = async (doc: DocumentInfo) => {
+    if (!isAuthenticated || !isAdmin) return;
+    const confirmed = window.confirm(tt("docs.confirmDelete", { name: doc.filename }));
+    if (!confirmed) return;
+    await runAction(`doc-delete-${doc.document_id}`, async () => {
+      try {
+        await deleteDocument(doc.document_id, token);
+        setStatus({ key: "status.docDeleted" });
+        await handleLoadDocuments();
+      } catch (error) {
+        console.error(error);
+        setStatus({ key: "status.docDeleteFailed" });
       }
     });
   };
@@ -759,19 +806,58 @@ export default function App() {
                   )}
                 </div>
 
+                {rewrittenQuery && (
+                  <div className="query-rewrite">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <span>{tt("query.searchedFor", { query: rewrittenQuery })}</span>
+                    {judgeCompleted && (
+                      <span className="judge-badge">{tt("query.judged")}</span>
+                    )}
+                  </div>
+                )}
+
                 <div className="context-section">
-                  <h4>{tt("workbench.noChunks").replace("No retrieval chunks yet.", "Retrieved Contexts").replace("暂无检索片段。", "检索上下文")}</h4>
+                  <h4>{tt("citation.contextTitle")}</h4>
                   {retrieved.length === 0 ? (
                     <p className="muted">{tt("workbench.noChunks")}</p>
                   ) : (
                     <div className="context-list">
-                      {retrieved.map((item, index) => (
-                        <article key={`${index}-${item.score}`} className="context-item">
-                          <span className="score">{item.score.toFixed(3)}</span>
-                          <p>{item.text}</p>
-                          {item.source && <small>{item.source}</small>}
-                        </article>
-                      ))}
+                      {retrieved.map((item, index) => {
+                        const pct = Math.round(item.score * 100);
+                        return (
+                          <article key={`${index}-${item.score}`} className="context-item">
+                            <div className="citation-meta">
+                              {item.source && (
+                                <span className="citation-source">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                  </svg>
+                                  {item.source}
+                                </span>
+                              )}
+                              {item.page_numbers && item.page_numbers.length > 0 && (
+                                <span className="citation-pages">
+                                  {tt("citation.page")}
+                                  {item.page_numbers.length === 1
+                                    ? item.page_numbers[0]
+                                    : `${item.page_numbers[0]}-${item.page_numbers[item.page_numbers.length - 1]}`}
+                                </span>
+                              )}
+                              <div className="relevance-bar-wrap">
+                                <span className="relevance-bar-label">{pct}%</span>
+                                <div className="relevance-bar">
+                                  <div className="relevance-bar-fill" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                            <p>{item.text}</p>
+                          </article>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -911,6 +997,45 @@ export default function App() {
                   <p className="muted">{tt("admin.noPermission")}</p>
                 </div>
               )}
+
+              {/* Documents */}
+              <div className="card">
+                <div className="card-header">
+                  <div>
+                    <h3>{tt("docs.title")}</h3>
+                    <p className="card-desc">{tt("docs.desc")}</p>
+                  </div>
+                  <button
+                    className="ghost btn-sm"
+                    onClick={handleLoadDocuments}
+                    disabled={!isAdmin || busyAction === "documents"}
+                  >
+                    {tt("docs.refresh")}
+                  </button>
+                </div>
+
+                {documents.length === 0 ? (
+                  <p className="muted" style={{ marginTop: 16 }}>{tt("docs.empty")}</p>
+                ) : (
+                  <ul className="doc-list">
+                    {documents.map((doc) => (
+                      <li key={doc.document_id} className="doc-item">
+                        <div className="doc-item-info">
+                          <div className="doc-item-name">{doc.filename}</div>
+                          <div className="doc-item-meta">{tt("docs.chunks", { count: doc.chunk_count })}</div>
+                        </div>
+                        <button
+                          className="btn-danger btn-sm"
+                          onClick={() => handleDeleteDocument(doc)}
+                          disabled={!isAdmin || busyAction === `doc-delete-${doc.document_id}`}
+                        >
+                          {tt("docs.delete")}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
               <div className="grid-2">
                 {/* Tenants */}

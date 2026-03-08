@@ -152,7 +152,29 @@ const messages: Record<Locale, Dictionary> = {
     "admin.assignUserId": "Assign tenant: user ID",
     "admin.assignTenantId": "Assign tenant: tenant ID",
     "admin.assignTenant": "Assign tenant",
-    "admin.noTenants": "no tenants"
+    "admin.noTenants": "no tenants",
+
+    "docs.title": "Documents",
+    "docs.desc": "Manage ingested documents for the current tenant.",
+    "docs.refresh": "Refresh",
+    "docs.empty": "No documents ingested yet.",
+    "docs.filename": "Filename",
+    "docs.chunks": ({ count }) => `${count} chunks`,
+    "docs.delete": "Delete",
+    "docs.confirmDelete": ({ name }) => `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+    "status.docsLoaded": ({ count }) => `Loaded ${count} documents.`,
+    "status.docsLoadFailed": "Failed to load documents.",
+    "status.docDeleted": "Document deleted.",
+    "status.docDeleteFailed": "Failed to delete document.",
+
+    "citation.source": "Source",
+    "citation.page": "p.",
+    "citation.relevance": "Relevance",
+    "citation.contextTitle": "Retrieved Contexts",
+
+    "query.searchedFor": ({ query }) => `Searched for: ${query}`,
+    "query.rewriting": "Rewriting query...",
+    "query.judged": "Relevance judged"
   },
   zh: {
     "lang.en": "EN",
@@ -301,7 +323,29 @@ const messages: Record<Locale, Dictionary> = {
     "admin.assignUserId": "分配租户：用户 ID",
     "admin.assignTenantId": "分配租户：租户 ID",
     "admin.assignTenant": "分配租户",
-    "admin.noTenants": "无租户"
+    "admin.noTenants": "无租户",
+
+    "docs.title": "文档管理",
+    "docs.desc": "管理当前租户的已入库文档。",
+    "docs.refresh": "刷新",
+    "docs.empty": "暂无入库文档。",
+    "docs.filename": "文件名",
+    "docs.chunks": ({ count }) => `${count} 个分块`,
+    "docs.delete": "删除",
+    "docs.confirmDelete": ({ name }) => `确定要删除"${name}"吗？此操作不可撤销。`,
+    "status.docsLoaded": ({ count }) => `已加载 ${count} 个文档。`,
+    "status.docsLoadFailed": "加载文档列表失败。",
+    "status.docDeleted": "文档已删除。",
+    "status.docDeleteFailed": "删除文档失败。",
+
+    "citation.source": "来源",
+    "citation.page": "p.",
+    "citation.relevance": "相关度",
+    "citation.contextTitle": "检索上下文",
+
+    "query.searchedFor": ({ query }) => `搜索了：${query}`,
+    "query.rewriting": "正在改写查询...",
+    "query.judged": "已完成相关性判断"
   }
 };
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +48,7 @@ class RetrievedChunk(BaseModel):
     text: str
     score: float
     source: Optional[str] = None
+    page_numbers: List[int] = []
 
 
 class ChatResponse(BaseModel):
@@ -123,3 +124,9 @@ class StreamEvent(BaseModel):
 
 class AssignTenantRequest(BaseModel):
     tenant_id: str
+
+
+class DocumentInfo(BaseModel):
+    document_id: str
+    filename: str
+    chunk_count: int

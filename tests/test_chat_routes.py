@@ -32,7 +32,7 @@ class TestChat:
     @patch("app.api.routes.chat.run_workflow")
     def test_completed_response(self, mock_workflow, mock_log):
         mock_workflow.return_value = {
-            "retrieved": [("text1", 0.9, "doc.pdf")],
+            "retrieved": [("text1", 0.9, "doc.pdf", [1])],
             "draft_answer": "The answer",
             "approval_required": False,
             "policy_blocked": False,
@@ -113,7 +113,7 @@ class TestChatStream:
     @patch("app.api.routes.chat.search_chunks")
     async def test_stream_completed(self, mock_search, mock_stream, mock_policy, mock_log, monkeypatch):
         monkeypatch.setattr("app.api.routes.chat.settings.require_approval", False)
-        mock_search.return_value = [("text1", 0.9, "doc.pdf")]
+        mock_search.return_value = [("text1", 0.9, "doc.pdf", [1])]
         mock_stream.return_value = _AsyncTokenIterator(["Hello", " world"])
         mock_policy.return_value = MagicMock(blocked=False, matched_rules=[])
 
