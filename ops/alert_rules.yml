@@ -32,3 +32,82 @@ groups:
         annotations:
           summary: "Complyra ingest queue backlog is high"
           description: "Ingest queue depth is above 100 jobs for 10 minutes."
+
+  - name: complyra-llm-alerts
+    rules:
+      - alert: ComplyraLLMHighErrorRate
+        expr: |
+          (sum(rate(llm_call_errors_total[5m])) / clamp_min(sum(rate(llm_call_duration_seconds_count[5m])), 0.001)) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: complyra-api
+        annotations:
+          summary: "LLM call error rate is above 10%"
+          description: "More than 10% of LLM calls are failing for 5 minutes. Provider: {{ $labels.provider }}"
+
+      - alert: ComplyraLLMSlowResponse
+        expr: |
+          histogram_quantile(0.95, sum by (le, provider) (rate(llm_call_duration_seconds_bucket[5m]))) > 30
+        for: 10m
+        labels:
+          severity: warning
+          service: complyra-api
+        annotations:
+          summary: "LLM p95 response time above 30s"
+          description: "LLM provider {{ $labels.provider }} p95 latency exceeds 30 seconds."
+
+      - alert: ComplyraRAGSlowQuery
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(rag_query_duration_seconds_bucket[5m]))) > 15
+        for: 10m
+        labels:
+          severity: warning
+          service: complyra-api
+        annotations:
+          summary: "RAG query p95 latency above 15s"
+          description: "End-to-end RAG queries are taking more than 15 seconds at p95."
+
+  - name: complyra-infra-alerts
+    rules:
+      - alert: ComplyraComponentDown
+        expr: health_check_status == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: complyra-api
+        annotations:
+          summary: "Component {{ $labels.component }} is down"
+          description: "Health check for {{ $labels.component }} has been failing for 2 minutes."
+
+      - alert: ComplyraHighPolicyBlocks
+        expr: |
+          (sum(rate(policy_evaluations_total{result="blocked"}[5m])) / clamp_min(sum(rate(policy_evaluations_total[5m])), 0.001)) > 0.5
+        for: 15m
+        labels:
+          severity: warning
+          service: complyra-api
+        annotations:
+          summary: "More than 50% of responses are policy-blocked"
+          description: "Output policy is blocking over 50% of responses for 15 minutes. Check for data contamination."
+
+      - alert: ComplyraIngestErrors
+        expr: sum(rate(document_ingest_total{status="error"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: complyra-worker
+        annotations:
+          summary: "Document ingestion errors detected"
+          description: "Document ingestion is producing persistent errors."
+
+      - alert: ComplyraSlowVectorSearch
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(retrieval_duration_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: complyra-api
+        annotations:
+          summary: "Vector search p95 latency above 2s"
+          description: "Qdrant vector search is taking more than 2 seconds at p95."

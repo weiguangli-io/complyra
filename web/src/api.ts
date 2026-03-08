@@ -6,6 +6,8 @@ import type {
   DocumentInfo,
   IngestJobResponse,
   IngestSubmitResponse,
+  LogsResponse,
+  MetricsSummary,
   Tenant,
   TokenResponse,
   UserAccount
@@ -181,6 +183,35 @@ export async function deleteDocument(documentId: string, token?: string | null):
   await client.delete(`/documents/${documentId}`, {
     headers: authHeaders(token)
   });
+}
+
+/* ── Admin Monitoring ───────────────────────────────────── */
+
+export async function fetchMetrics(token?: string | null): Promise<MetricsSummary> {
+  const response = await client.get<MetricsSummary>("/admin/monitoring/metrics", {
+    headers: authHeaders(token)
+  });
+  return response.data;
+}
+
+export async function fetchLogs(
+  token?: string | null,
+  params?: { limit?: number; level?: string; search?: string; since_minutes?: number }
+): Promise<LogsResponse> {
+  const query = new URLSearchParams();
+  if (params?.limit) query.append("limit", String(params.limit));
+  if (params?.level) query.append("level", params.level);
+  if (params?.search) query.append("search", params.search);
+  if (params?.since_minutes) query.append("since_minutes", String(params.since_minutes));
+  const response = await client.get<LogsResponse>(`/admin/monitoring/logs?${query.toString()}`, {
+    headers: authHeaders(token)
+  });
+  return response.data;
+}
+
+export async function fetchHealthCheck(token?: string | null): Promise<Record<string, unknown>> {
+  const response = await client.get("/health/ready", { headers: authHeaders(token) });
+  return response.data;
 }
 
 /**

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, chat, documents, ingest, audit, health, approvals, tenants, users
+from app.api.routes import auth, chat, documents, ingest, audit, health, approvals, tenants, users, monitoring
 
 
 api_router = APIRouter()
@@ -13,3 +13,4 @@ api_router.include_router(approvals.router)
 api_router.include_router(tenants.router)
 api_router.include_router(users.router)
 api_router.include_router(health.router)
+api_router.include_router(monitoring.router)

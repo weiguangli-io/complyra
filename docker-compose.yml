@@ -141,8 +141,12 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/complyra.json
     volumes:
       - ./ops/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./ops/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
     deploy:
       resources:
         limits:

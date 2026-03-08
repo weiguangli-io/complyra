@@ -134,4 +134,12 @@ def get_embedder() -> EmbeddingProvider:
 @traceable(name="embed_texts", run_type="embedding")
 def embed_texts(texts: List[str]) -> List[List[float]]:
     """Embed a list of texts using the configured provider."""
-    return get_embedder().embed_texts(texts)
+    import time
+    from app.core.metrics import EMBEDDING_DURATION, EMBEDDING_TEXTS_PROCESSED
+
+    provider = settings.embedding_provider
+    start = time.perf_counter()
+    result = get_embedder().embed_texts(texts)
+    EMBEDDING_DURATION.labels(provider=provider).observe(time.perf_counter() - start)
+    EMBEDDING_TEXTS_PROCESSED.labels(provider=provider).inc(len(texts))
+    return result

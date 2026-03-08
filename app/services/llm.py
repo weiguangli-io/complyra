@@ -169,17 +169,10 @@ async def _generate_gemini_stream(
 
 
 def describe_image(image_bytes: bytes) -> str:
-    """Describe image content using Gemini's multimodal API.
+    """Describe image content using Gemini's multimodal API."""
+    import time
+    from app.core.metrics import LLM_CALL_DURATION, LLM_CALL_ERRORS
 
-    Extracts text, describes charts/diagrams, and provides detailed
-    descriptions of image content for indexing.
-
-    Args:
-        image_bytes: Raw image bytes (PNG, JPEG, etc.).
-
-    Returns:
-        Text description of the image content.
-    """
     if not settings.gemini_api_key:
         logger.warning("Gemini API key not configured; skipping image description")
         return ""
@@ -212,13 +205,19 @@ def describe_image(image_bytes: bytes) -> str:
         ],
         "generationConfig": {"temperature": 0.2},
     }
+    start = time.perf_counter()
     try:
         with httpx.Client(timeout=60) as client:
             resp = client.post(url, json=payload)
             resp.raise_for_status()
             data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            result = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            LLM_CALL_DURATION.labels(provider="gemini", operation="vision").observe(
+                time.perf_counter() - start
+            )
+            return result
     except Exception:
+        LLM_CALL_ERRORS.labels(provider="gemini", operation="vision").inc()
         logger.exception("Failed to describe image via Gemini Vision")
         return ""
 
@@ -229,26 +228,55 @@ def describe_image(image_bytes: bytes) -> str:
 @traceable(name="generate_answer", run_type="llm")
 def generate_answer(question: str, contexts: List[str], sources: List[str] | None = None) -> str:
     """Generate a complete answer synchronously."""
-    if settings.llm_provider == "openai":
-        return _generate_openai(question, contexts, sources)
-    if settings.llm_provider == "gemini":
-        return _generate_gemini(question, contexts, sources)
-    return _generate_ollama(question, contexts, sources)
+    import time
+    from app.core.metrics import LLM_CALL_DURATION, LLM_CALL_ERRORS
+
+    provider = settings.llm_provider
+    start = time.perf_counter()
+    try:
+        if provider == "openai":
+            result = _generate_openai(question, contexts, sources)
+        elif provider == "gemini":
+            result = _generate_gemini(question, contexts, sources)
+        else:
+            result = _generate_ollama(question, contexts, sources)
+        LLM_CALL_DURATION.labels(provider=provider, operation="generate").observe(
+            time.perf_counter() - start
+        )
+        return result
+    except Exception:
+        LLM_CALL_ERRORS.labels(provider=provider, operation="generate").inc()
+        raise
 
 
 async def generate_answer_stream(
     question: str, contexts: List[str], sources: List[str] | None = None
 ) -> AsyncIterator[str]:
     """Yield token chunks from the configured LLM provider."""
-    if settings.llm_provider == "openai":
-        async for token in _generate_openai_stream(question, contexts, sources):
-            yield token
-    elif settings.llm_provider == "gemini":
-        async for token in _generate_gemini_stream(question, contexts, sources):
-            yield token
-    else:
-        async for token in _generate_ollama_stream(question, contexts, sources):
-            yield token
+    import time
+    from app.core.metrics import LLM_CALL_DURATION, LLM_CALL_ERRORS, LLM_TOKENS_GENERATED
+
+    provider = settings.llm_provider
+    start = time.perf_counter()
+    try:
+        if provider == "openai":
+            async for token in _generate_openai_stream(question, contexts, sources):
+                LLM_TOKENS_GENERATED.labels(provider=provider).inc()
+                yield token
+        elif provider == "gemini":
+            async for token in _generate_gemini_stream(question, contexts, sources):
+                LLM_TOKENS_GENERATED.labels(provider=provider).inc()
+                yield token
+        else:
+            async for token in _generate_ollama_stream(question, contexts, sources):
+                LLM_TOKENS_GENERATED.labels(provider=provider).inc()
+                yield token
+        LLM_CALL_DURATION.labels(provider=provider, operation="stream").observe(
+            time.perf_counter() - start
+        )
+    except Exception:
+        LLM_CALL_ERRORS.labels(provider=provider, operation="stream").inc()
+        raise
 
 
 def ollama_health() -> bool:

@@ -1207,3 +1207,320 @@ tbody tr:last-child td {
   .login-card { margin: 14px; }
   .card { padding: 16px; }
 }
+
+/* ================================================================
+   Monitoring Dashboard
+   ================================================================ */
+
+.monitor-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--card);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.monitor-tab {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-2);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.875rem;
+}
+
+.monitor-tab:hover { background: var(--c-pri-soft); color: var(--c-pri); }
+.monitor-tab.active { background: var(--c-pri); color: #fff; }
+
+.monitor-tabs-spacer { flex: 1; }
+
+.monitor-auto-refresh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--fg-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.monitor-auto-refresh input { accent-color: var(--c-pri); }
+
+/* ── Stat Cards ──────────────────────────────────────────── */
+
+.monitor-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .monitor-stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.monitor-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.monitor-stat-card:hover { border-color: var(--c-pri-border); }
+
+.monitor-stat-card.stat-danger {
+  border-color: var(--c-err-border);
+  background: var(--c-err-soft);
+}
+
+.monitor-stat-card.stat-warning {
+  border-color: var(--c-warn-border);
+  background: var(--c-warn-soft);
+}
+
+.monitor-stat-label {
+  font-size: 0.75rem;
+  color: var(--fg-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.monitor-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+/* ── KV Grid (metric cards) ──────────────────────────────── */
+
+.monitor-kv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.monitor-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.monitor-kv-label {
+  font-size: 0.8rem;
+  color: var(--fg-2);
+}
+
+.monitor-kv-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.text-danger { color: var(--c-err) !important; }
+
+.monitor-provider-list {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.monitor-provider-list h4 {
+  font-size: 0.8rem;
+  color: var(--fg-2);
+  margin-bottom: 8px;
+}
+
+.monitor-provider-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 0.85rem;
+  color: var(--fg-2);
+}
+
+/* ── Badge variants ──────────────────────────────────────── */
+
+.badge-danger {
+  background: var(--c-err-soft);
+  color: var(--c-err);
+  border: 1px solid var(--c-err-border);
+}
+
+.badge-sm { font-size: 0.7rem; padding: 2px 6px; }
+
+/* ── Log Viewer ──────────────────────────────────────────── */
+
+.monitor-log-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.monitor-log-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+
+.monitor-log-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+
+.monitor-log-search:focus {
+  outline: none;
+  border-color: var(--c-pri);
+  box-shadow: 0 0 0 2px var(--c-pri-soft);
+}
+
+.monitor-log-counts {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.monitor-log-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.monitor-log-entry {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.monitor-log-entry:hover { background: var(--c-pri-soft); }
+
+.monitor-log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.monitor-log-time {
+  color: var(--fg-2);
+  font-family: monospace;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.monitor-log-logger {
+  color: var(--c-pri);
+  font-size: 0.78rem;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-log-msg {
+  color: var(--fg);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-log-detail {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--fg-2);
+  font-family: monospace;
+  line-height: 1.6;
+}
+
+/* ── Health Status ───────────────────────────────────────── */
+
+.monitor-health-info {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 16px;
+  flex-wrap: wrap;
+}
+
+.monitor-health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.monitor-health-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.monitor-health-card.health-up {
+  border-color: var(--c-ok-border);
+  background: var(--c-ok-soft);
+}
+
+.monitor-health-card.health-down {
+  border-color: var(--c-err-border);
+  background: var(--c-err-soft);
+}
+
+.monitor-health-indicator { font-size: 1.8rem; margin-bottom: 6px; }
+
+.monitor-health-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fg);
+  margin-bottom: 4px;
+}
+
+.monitor-health-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.health-up .monitor-health-status { color: var(--c-ok); }
+.health-down .monitor-health-status { color: var(--c-err); }
+
+.monitor-health-latency {
+  font-size: 0.78rem;
+  color: var(--fg-2);
+  margin-top: 4px;
+}
+
+.monitor-health-error {
+  font-size: 0.72rem;
+  color: var(--c-err);
+  margin-top: 4px;
+  word-break: break-all;
+}

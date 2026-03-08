@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   askQuestion,
   assignUserTenant,
@@ -9,6 +9,9 @@ import {
   deleteDocument,
   fetchApprovals,
   fetchAudit,
+  fetchHealthCheck,
+  fetchLogs,
+  fetchMetrics,
   getApprovalResult,
   getIngestJob,
   ingestFile,
@@ -24,13 +27,15 @@ import type {
   AuditRecord,
   DocumentInfo,
   IngestJobResponse,
+  LogEntry,
+  MetricsSummary,
   RetrievedChunk,
   Tenant,
   UserAccount
 } from "./types";
 import "./styles.css";
 
-type Panel = "workbench" | "approvals" | "audit" | "admin";
+type Panel = "workbench" | "approvals" | "audit" | "admin" | "monitoring";
 
 type StatusMessage = {
   key: string;
@@ -41,7 +46,8 @@ const PANELS: Array<{ id: Panel; labelKey: string }> = [
   { id: "workbench", labelKey: "panel.workbench" },
   { id: "approvals", labelKey: "panel.approvals" },
   { id: "audit", labelKey: "panel.audit" },
-  { id: "admin", labelKey: "panel.admin" }
+  { id: "admin", labelKey: "panel.admin" },
+  { id: "monitoring", labelKey: "panel.monitoring" }
 ];
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,6 +81,12 @@ const IconSettings = () => (
   </svg>
 );
 
+const IconMonitor = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+
 const IconLogo = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="12 2 2 7 12 12 22 7 12 2" />
@@ -87,7 +99,8 @@ const NAV_ICONS: Record<Panel, () => React.ReactElement> = {
   workbench: IconChat,
   approvals: IconShield,
   audit: IconClipboard,
-  admin: IconSettings
+  admin: IconSettings,
+  monitoring: IconMonitor
 };
 
 export default function App() {
@@ -133,6 +146,18 @@ export default function App() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [rewrittenQuery, setRewrittenQuery] = useState<string | null>(null);
   const [judgeCompleted, setJudgeCompleted] = useState(false);
+
+  // Monitoring state
+  const [monitorMetrics, setMonitorMetrics] = useState<MetricsSummary | null>(null);
+  const [monitorLogs, setMonitorLogs] = useState<LogEntry[]>([]);
+  const [monitorLogCounts, setMonitorLogCounts] = useState<Record<string, number>>({});
+  const [monitorHealth, setMonitorHealth] = useState<Record<string, unknown> | null>(null);
+  const [monitorLogLevel, setMonitorLogLevel] = useState<string>("");
+  const [monitorLogSearch, setMonitorLogSearch] = useState<string>("");
+  const [monitorAutoRefresh, setMonitorAutoRefresh] = useState(true);
+  const [monitorTab, setMonitorTab] = useState<"dashboard" | "logs" | "health">("dashboard");
+  const [expandedLogIdx, setExpandedLogIdx] = useState<number | null>(null);
+  const monitorTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isAuthenticated = useMemo(() => Boolean(token), [token]);
   const isAdmin = role === "admin";
@@ -488,6 +513,47 @@ export default function App() {
       }
     });
   };
+
+  // ── Monitoring data fetching ──────────────────────────────
+  const loadMonitoringData = useCallback(async () => {
+    if (!isAuthenticated || !isAdmin) return;
+    try {
+      const [metricsData, logsData, healthData] = await Promise.all([
+        fetchMetrics(token),
+        fetchLogs(token, {
+          limit: 200,
+          level: monitorLogLevel || undefined,
+          search: monitorLogSearch || undefined,
+        }),
+        fetchHealthCheck(token),
+      ]);
+      setMonitorMetrics(metricsData);
+      setMonitorLogs(logsData.entries);
+      setMonitorLogCounts(logsData.counts);
+      setMonitorHealth(healthData);
+    } catch (err) {
+      console.error("Failed to load monitoring data:", err);
+    }
+  }, [isAuthenticated, isAdmin, token, monitorLogLevel, monitorLogSearch]);
+
+  useEffect(() => {
+    if (activePanel === "monitoring" && isAdmin) {
+      loadMonitoringData();
+    }
+  }, [activePanel, loadMonitoringData, isAdmin]);
+
+  useEffect(() => {
+    if (activePanel === "monitoring" && monitorAutoRefresh && isAdmin) {
+      monitorTimerRef.current = setInterval(loadMonitoringData, 10000);
+      return () => {
+        if (monitorTimerRef.current) clearInterval(monitorTimerRef.current);
+      };
+    }
+    if (monitorTimerRef.current) {
+      clearInterval(monitorTimerRef.current);
+      monitorTimerRef.current = null;
+    }
+  }, [activePanel, monitorAutoRefresh, isAdmin, loadMonitoringData]);
 
   const panelTitle = PANELS.find((p) => p.id === activePanel);
   const isBusy = busyAction !== null;
@@ -1175,6 +1241,306 @@ export default function App() {
                   </ul>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── Monitoring ─────────────────────────────────── */}
+          {activePanel === "monitoring" && (
+            <div className="stack animate-in">
+              {!isAdmin && (
+                <div className="card"><p className="muted">{tt("admin.noPermission")}</p></div>
+              )}
+
+              {/* Tab Bar */}
+              <div className="monitor-tabs">
+                {(["dashboard", "logs", "health"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    className={`monitor-tab ${monitorTab === tab ? "active" : ""}`}
+                    onClick={() => setMonitorTab(tab)}
+                  >
+                    {tt(`monitor.tab.${tab}`)}
+                  </button>
+                ))}
+                <div className="monitor-tabs-spacer" />
+                <label className="monitor-auto-refresh">
+                  <input
+                    type="checkbox"
+                    checked={monitorAutoRefresh}
+                    onChange={(e) => setMonitorAutoRefresh(e.target.checked)}
+                  />
+                  {tt("monitor.autoRefresh")}
+                </label>
+                <button className="ghost btn-sm" onClick={loadMonitoringData}>
+                  {tt("monitor.refresh")}
+                </button>
+              </div>
+
+              {/* Dashboard Tab */}
+              {monitorTab === "dashboard" && monitorMetrics && (
+                <>
+                  {/* Stat Cards Row */}
+                  <div className="monitor-stats-grid">
+                    <div className="monitor-stat-card">
+                      <div className="monitor-stat-label">{tt("monitor.totalRequests")}</div>
+                      <div className="monitor-stat-value">{Math.round(monitorMetrics.http.total_requests)}</div>
+                    </div>
+                    <div className={`monitor-stat-card ${monitorMetrics.http.error_rate > 0.05 ? "stat-danger" : ""}`}>
+                      <div className="monitor-stat-label">{tt("monitor.errorRate")}</div>
+                      <div className="monitor-stat-value">{(monitorMetrics.http.error_rate * 100).toFixed(2)}%</div>
+                    </div>
+                    <div className="monitor-stat-card">
+                      <div className="monitor-stat-label">{tt("monitor.avgLatency")}</div>
+                      <div className="monitor-stat-value">{(monitorMetrics.http.avg_latency * 1000).toFixed(0)}ms</div>
+                    </div>
+                    <div className={`monitor-stat-card ${monitorMetrics.ingestion.queue_depth > 50 ? "stat-warning" : ""}`}>
+                      <div className="monitor-stat-label">{tt("monitor.queueDepth")}</div>
+                      <div className="monitor-stat-value">{monitorMetrics.ingestion.queue_depth}</div>
+                    </div>
+                    <div className="monitor-stat-card">
+                      <div className="monitor-stat-label">{tt("monitor.ragQueries")}</div>
+                      <div className="monitor-stat-value">{Math.round(monitorMetrics.rag.query_count)}</div>
+                    </div>
+                    <div className="monitor-stat-card">
+                      <div className="monitor-stat-label">{tt("monitor.docsIngested")}</div>
+                      <div className="monitor-stat-value">{Math.round(monitorMetrics.ingestion.documents_total)}</div>
+                    </div>
+                  </div>
+
+                  {/* LLM & RAG Cards */}
+                  <div className="grid-2">
+                    <div className="card">
+                      <h3>{tt("monitor.llmPerformance")}</h3>
+                      <div className="monitor-kv-grid">
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.llmCalls")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.llm.call_count)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.llmAvgDuration")}</span>
+                          <span className="monitor-kv-value">{monitorMetrics.llm.avg_duration.toFixed(2)}s</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.llmErrors")}</span>
+                          <span className={`monitor-kv-value ${monitorMetrics.llm.error_count > 0 ? "text-danger" : ""}`}>{monitorMetrics.llm.error_count}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.llmTokens")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.llm.tokens_generated)}</span>
+                        </div>
+                      </div>
+                      {Object.keys(monitorMetrics.llm.by_provider).length > 0 && (
+                        <div className="monitor-provider-list">
+                          <h4>{tt("monitor.byProvider")}</h4>
+                          {Object.entries(monitorMetrics.llm.by_provider).map(([provider, stats]) => (
+                            <div key={provider} className="monitor-provider-item">
+                              <span className="badge badge-info">{provider}</span>
+                              <span>{Math.round(stats.count)} calls</span>
+                              <span>{stats.avg.toFixed(2)}s avg</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="card">
+                      <h3>{tt("monitor.ragPipeline")}</h3>
+                      <div className="monitor-kv-grid">
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.ragQueries")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.rag.query_count)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.ragAvgDuration")}</span>
+                          <span className="monitor-kv-value">{monitorMetrics.rag.avg_duration.toFixed(2)}s</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.vectorSearches")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.retrieval.search_count)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.embeddingTexts")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.embedding.texts_processed)}</span>
+                        </div>
+                      </div>
+                      {Object.keys(monitorMetrics.rag.by_status).length > 0 && (
+                        <div className="monitor-provider-list">
+                          <h4>{tt("monitor.queryStatus")}</h4>
+                          {Object.entries(monitorMetrics.rag.by_status).map(([status, count]) => (
+                            <div key={status} className="monitor-provider-item">
+                              <span className={`badge ${status === "success" ? "badge-success" : status === "blocked" ? "badge-warning" : "badge-info"}`}>{status}</span>
+                              <span>{Math.round(count)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ingestion & Policy Cards */}
+                  <div className="grid-2">
+                    <div className="card">
+                      <h3>{tt("monitor.ingestion")}</h3>
+                      <div className="monitor-kv-grid">
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.docsIngested")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.ingestion.success_count)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.ingestErrors")}</span>
+                          <span className={`monitor-kv-value ${monitorMetrics.ingestion.error_count > 0 ? "text-danger" : ""}`}>{Math.round(monitorMetrics.ingestion.error_count)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.chunksTotal")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.ingestion.chunks_total)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.avgIngestTime")}</span>
+                          <span className="monitor-kv-value">{monitorMetrics.ingestion.avg_duration.toFixed(2)}s</span>
+                        </div>
+                      </div>
+                      {Object.keys(monitorMetrics.ingestion.by_type).length > 0 && (
+                        <div className="monitor-provider-list">
+                          <h4>{tt("monitor.byFileType")}</h4>
+                          {Object.entries(monitorMetrics.ingestion.by_type).map(([type, count]) => (
+                            <div key={type} className="monitor-provider-item">
+                              <span className="badge badge-info">{type}</span>
+                              <span>{Math.round(count)} docs</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="card">
+                      <h3>{tt("monitor.outputPolicy")}</h3>
+                      <div className="monitor-kv-grid">
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.policyTotal")}</span>
+                          <span className="monitor-kv-value">{Math.round(monitorMetrics.policy.total)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.policyPassed")}</span>
+                          <span className="monitor-kv-value" style={{ color: "var(--c-success)" }}>{Math.round(monitorMetrics.policy.passed)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.policyBlocked")}</span>
+                          <span className={`monitor-kv-value ${monitorMetrics.policy.blocked > 0 ? "text-danger" : ""}`}>{Math.round(monitorMetrics.policy.blocked)}</span>
+                        </div>
+                        <div className="monitor-kv">
+                          <span className="monitor-kv-label">{tt("monitor.httpErrors")}</span>
+                          <span className={`monitor-kv-value ${monitorMetrics.http.error_count > 0 ? "text-danger" : ""}`}>{Math.round(monitorMetrics.http.error_count)}</span>
+                        </div>
+                      </div>
+                      {Object.keys(monitorMetrics.http.by_status).length > 0 && (
+                        <div className="monitor-provider-list">
+                          <h4>{tt("monitor.httpByStatus")}</h4>
+                          {Object.entries(monitorMetrics.http.by_status).map(([code, count]) => (
+                            <div key={code} className="monitor-provider-item">
+                              <span className={`badge ${code.startsWith("2") ? "badge-success" : code.startsWith("4") ? "badge-warning" : code.startsWith("5") ? "badge-danger" : "badge-info"}`}>{code}</span>
+                              <span>{Math.round(count)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Logs Tab */}
+              {monitorTab === "logs" && (
+                <div className="card">
+                  <div className="monitor-log-toolbar">
+                    <select
+                      className="monitor-log-select"
+                      value={monitorLogLevel}
+                      onChange={(e) => setMonitorLogLevel(e.target.value)}
+                    >
+                      <option value="">{tt("monitor.allLevels")}</option>
+                      <option value="ERROR">ERROR</option>
+                      <option value="WARNING">WARNING</option>
+                      <option value="INFO">INFO</option>
+                      <option value="DEBUG">DEBUG</option>
+                    </select>
+                    <input
+                      className="monitor-log-search"
+                      type="text"
+                      placeholder={tt("monitor.searchLogs")}
+                      value={monitorLogSearch}
+                      onChange={(e) => setMonitorLogSearch(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && loadMonitoringData()}
+                    />
+                    <button className="ghost btn-sm" onClick={loadMonitoringData}>{tt("monitor.filter")}</button>
+                    <div className="monitor-log-counts">
+                      {Object.entries(monitorLogCounts).map(([level, count]) =>
+                        count > 0 ? (
+                          <span key={level} className={`badge badge-sm ${level === "ERROR" ? "badge-danger" : level === "WARNING" ? "badge-warning" : "badge-info"}`}>
+                            {level}: {count}
+                          </span>
+                        ) : null
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="monitor-log-list">
+                    {monitorLogs.length === 0 ? (
+                      <p className="muted" style={{ padding: 16 }}>{tt("monitor.noLogs")}</p>
+                    ) : (
+                      monitorLogs.map((log, idx) => (
+                        <div key={idx} className="monitor-log-entry" onClick={() => setExpandedLogIdx(expandedLogIdx === idx ? null : idx)}>
+                          <div className="monitor-log-row">
+                            <span className="monitor-log-time">
+                              {new Date(log.timestamp * 1000).toLocaleTimeString(locale === "zh" ? "zh-CN" : "en-US", { hour12: false })}
+                            </span>
+                            <span className={`badge badge-sm ${log.level === "ERROR" ? "badge-danger" : log.level === "WARNING" ? "badge-warning" : "badge-info"}`}>
+                              {log.level}
+                            </span>
+                            <span className="monitor-log-logger">{log.logger}</span>
+                            <span className="monitor-log-msg">{log.message}</span>
+                          </div>
+                          {expandedLogIdx === idx && (
+                            <div className="monitor-log-detail">
+                              {log.request_id && <div><strong>Request ID:</strong> {log.request_id}</div>}
+                              {Object.entries(log.extra).map(([k, v]) => (
+                                <div key={k}><strong>{k}:</strong> {v}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Health Tab */}
+              {monitorTab === "health" && monitorHealth && (
+                <div className="card">
+                  <h3>{tt("monitor.systemHealth")}</h3>
+                  <div className="monitor-health-info">
+                    <span className="badge badge-info">{tt("monitor.version")}: {String((monitorHealth as Record<string, unknown>).version ?? "")}</span>
+                    <span className="badge badge-info">{tt("monitor.environment")}: {String((monitorHealth as Record<string, unknown>).environment ?? "")}</span>
+                    <span className="badge badge-info">LLM: {String((monitorHealth as Record<string, unknown>).llm_provider ?? "")}</span>
+                    <span className="badge badge-info">Embedding: {String((monitorHealth as Record<string, unknown>).embedding_provider ?? "")}</span>
+                  </div>
+                  <div className="monitor-health-grid">
+                    {Object.entries(((monitorHealth as Record<string, unknown>).checks ?? {}) as Record<string, Record<string, unknown>>).map(([component, detail]) => (
+                      <div key={component} className={`monitor-health-card ${detail.status ? "health-up" : "health-down"}`}>
+                        <div className="monitor-health-indicator">{detail.status ? "\u2705" : "\u274C"}</div>
+                        <div className="monitor-health-name">{component.charAt(0).toUpperCase() + component.slice(1)}</div>
+                        <div className="monitor-health-status">{detail.status ? "UP" : "DOWN"}</div>
+                        {detail.latency_ms !== undefined && (
+                          <div className="monitor-health-latency">{String(detail.latency_ms)}ms</div>
+                        )}
+                        {"error" in detail && detail.error ? (
+                          <div className="monitor-health-error">{String(detail.error).slice(0, 60)}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>

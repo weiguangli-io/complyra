@@ -245,52 +245,75 @@ def validate_ingest_filename(filename: str) -> str:
 
 
 def ingest_document(file_bytes: bytes, filename: str, tenant_id: str) -> Tuple[str, int]:
+    import time
+    from app.core.metrics import DOCUMENT_INGEST_TOTAL, DOCUMENT_INGEST_DURATION, CHUNKS_PRODUCED_TOTAL
+
+    ingest_start = time.perf_counter()
     extension = validate_ingest_filename(filename)
 
-    if extension in ("png", "jpg", "jpeg"):
-        # Image file: describe via Gemini Vision and store as a single chunk
-        from app.services.llm import describe_image
+    try:
+        if extension in ("png", "jpg", "jpeg"):
+            from app.services.llm import describe_image
 
-        description = describe_image(file_bytes)
-        if not description:
-            return "", 0
-        text = f"[Image: {filename}]\n\n[Image description: {description}]"
-        chunks = chunk_text(text) if len(text) > settings.chunk_size else [text]
-        if not chunks:
-            return "", 0
-        document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
-        return document_id, len(chunks)
-    elif extension == "pdf":
-        pages = extract_text_from_pdf(file_bytes)
-
-        if settings.chunking_strategy == "smart":
-            smart_chunks = smart_chunk_text(pages)
-            if not smart_chunks:
+            description = describe_image(file_bytes)
+            if not description:
+                DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="empty").inc()
                 return "", 0
-            chunk_texts = [c.text for c in smart_chunks]
-            chunk_page_numbers = [c.page_numbers for c in smart_chunks]
-            document_id = upsert_chunks(
-                chunk_texts,
-                source=filename,
-                tenant_id=tenant_id,
-                page_numbers=chunk_page_numbers,
-            )
-            return document_id, len(smart_chunks)
-        else:
-            # Fixed chunking fallback: join all page texts
-            full_text = "\n".join(p.text for p in pages)
-            chunks = chunk_text(full_text)
+            text = f"[Image: {filename}]\n\n[Image description: {description}]"
+            chunks = chunk_text(text) if len(text) > settings.chunk_size else [text]
             if not chunks:
+                DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="empty").inc()
                 return "", 0
             document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
+            CHUNKS_PRODUCED_TOTAL.inc(len(chunks))
+            DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="success").inc()
+            DOCUMENT_INGEST_DURATION.labels(file_type=extension).observe(time.perf_counter() - ingest_start)
             return document_id, len(chunks)
-    else:
-        text = extract_text_from_bytes(file_bytes)
-        chunks = chunk_text(text)
-        if not chunks:
-            return "", 0
-        document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
-        return document_id, len(chunks)
+        elif extension == "pdf":
+            pages = extract_text_from_pdf(file_bytes)
+
+            if settings.chunking_strategy == "smart":
+                smart_chunks = smart_chunk_text(pages)
+                if not smart_chunks:
+                    DOCUMENT_INGEST_TOTAL.labels(file_type="pdf", status="empty").inc()
+                    return "", 0
+                chunk_texts = [c.text for c in smart_chunks]
+                chunk_page_numbers = [c.page_numbers for c in smart_chunks]
+                document_id = upsert_chunks(
+                    chunk_texts,
+                    source=filename,
+                    tenant_id=tenant_id,
+                    page_numbers=chunk_page_numbers,
+                )
+                CHUNKS_PRODUCED_TOTAL.inc(len(smart_chunks))
+                DOCUMENT_INGEST_TOTAL.labels(file_type="pdf", status="success").inc()
+                DOCUMENT_INGEST_DURATION.labels(file_type="pdf").observe(time.perf_counter() - ingest_start)
+                return document_id, len(smart_chunks)
+            else:
+                full_text = "\n".join(p.text for p in pages)
+                chunks = chunk_text(full_text)
+                if not chunks:
+                    DOCUMENT_INGEST_TOTAL.labels(file_type="pdf", status="empty").inc()
+                    return "", 0
+                document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
+                CHUNKS_PRODUCED_TOTAL.inc(len(chunks))
+                DOCUMENT_INGEST_TOTAL.labels(file_type="pdf", status="success").inc()
+                DOCUMENT_INGEST_DURATION.labels(file_type="pdf").observe(time.perf_counter() - ingest_start)
+                return document_id, len(chunks)
+        else:
+            text = extract_text_from_bytes(file_bytes)
+            chunks = chunk_text(text)
+            if not chunks:
+                DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="empty").inc()
+                return "", 0
+            document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
+            CHUNKS_PRODUCED_TOTAL.inc(len(chunks))
+            DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="success").inc()
+            DOCUMENT_INGEST_DURATION.labels(file_type=extension).observe(time.perf_counter() - ingest_start)
+            return document_id, len(chunks)
+    except Exception:
+        DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="error").inc()
+        raise
 
 
 def ingest_document_from_path(file_path: str, filename: str, tenant_id: str) -> Tuple[str, int]:

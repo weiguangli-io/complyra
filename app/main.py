@@ -42,6 +42,11 @@ async def app_lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     setup_logging()
 
+    # Attach in-memory log buffer for admin monitoring dashboard
+    from app.core.log_buffer import BufferHandler
+    root_logger = logging.getLogger()
+    root_logger.addHandler(BufferHandler())
+
     # Enable LangSmith tracing when configured — sets env vars that LangGraph reads automatically
     if settings.langsmith_tracing and settings.langsmith_api_key:
         import os

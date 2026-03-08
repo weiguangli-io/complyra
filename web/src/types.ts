@@ -83,3 +83,66 @@ export type UserAccount = {
   tenant_ids: string[];
   created_at: string;
 };
+
+export type MetricsSummary = {
+  http: {
+    total_requests: number;
+    error_count: number;
+    error_rate: number;
+    avg_latency: number;
+    by_status: Record<string, number>;
+  };
+  llm: {
+    call_count: number;
+    avg_duration: number;
+    error_count: number;
+    tokens_generated: number;
+    by_provider: Record<string, { count: number; avg: number }>;
+  };
+  rag: {
+    query_count: number;
+    avg_duration: number;
+    by_status: Record<string, number>;
+  };
+  retrieval: {
+    search_count: number;
+    avg_duration: number;
+    by_type: Record<string, { count: number; avg: number }>;
+  };
+  embedding: {
+    call_count: number;
+    avg_duration: number;
+    texts_processed: number;
+  };
+  ingestion: {
+    documents_total: number;
+    success_count: number;
+    error_count: number;
+    avg_duration: number;
+    chunks_total: number;
+    queue_depth: number;
+    by_type: Record<string, number>;
+  };
+  policy: {
+    total: number;
+    blocked: number;
+    passed: number;
+    by_result: Record<string, number>;
+  };
+  health: Record<string, number>;
+};
+
+export type LogEntry = {
+  timestamp: number;
+  level: string;
+  logger: string;
+  message: string;
+  request_id: string;
+  extra: Record<string, string>;
+};
+
+export type LogsResponse = {
+  entries: LogEntry[];
+  counts: Record<string, number>;
+  total_buffered: number;
+};

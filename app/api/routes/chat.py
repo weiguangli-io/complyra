@@ -37,11 +37,11 @@ def chat(
     tenant_id: str = Depends(get_tenant_id),
     user: dict = Depends(get_current_user),
 ) -> ChatResponse:
-    """Synchronous chat endpoint — returns a complete JSON response.
+    """Synchronous chat endpoint — returns a complete JSON response."""
+    import time
+    from app.core.metrics import RAG_QUERY_TOTAL, RAG_QUERY_DURATION
 
-    Uses the LangGraph workflow which includes rewrite, retrieve,
-    judge, and draft nodes.
-    """
+    rag_start = time.perf_counter()
     state = run_workflow(payload.question, tenant_id, user["user_id"])
     matches = state.get("retrieved", [])
     approval_required = state.get("approval_required", False)
@@ -82,6 +82,10 @@ def chat(
             }
         ),
     )
+
+    rag_status = "blocked" if policy_blocked else ("pending" if approval_required else "success")
+    RAG_QUERY_TOTAL.labels(status=rag_status).inc()
+    RAG_QUERY_DURATION.observe(time.perf_counter() - rag_start)
 
     return ChatResponse(
         status=status, answer=answer, retrieved=retrieved, approval_id=approval_id

@@ -253,6 +253,10 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
 
     Returns a list of tuples: (text, score, source, page_numbers).
     """
+    import time
+    from app.core.metrics import RETRIEVAL_DURATION, RETRIEVAL_RESULTS_COUNT
+
+    search_start = time.perf_counter()
     ensure_collection()
     client = get_qdrant_client()
     dense_vector = embed_texts([query])[0]
@@ -312,6 +316,11 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
                 query_filter=tenant_filter,
             )
 
+    search_type = "hybrid" if use_hybrid else "dense"
+    RETRIEVAL_DURATION.labels(search_type=search_type).observe(
+        time.perf_counter() - search_start
+    )
+
     matches: List[Tuple[str, float, str, List[int]]] = []
     for res in results.points:
         payload = res.payload or {}
@@ -321,4 +330,6 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
             payload.get("source", ""),
             payload.get("page_numbers", []),
         ))
+
+    RETRIEVAL_RESULTS_COUNT.observe(len(matches))
     return matches
