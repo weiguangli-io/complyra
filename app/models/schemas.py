@@ -130,3 +130,50 @@ class DocumentInfo(BaseModel):
     document_id: str
     filename: str
     chunk_count: int
+
+
+class DocumentDetailResponse(BaseModel):
+    document_id: str
+    tenant_id: str
+    filename: str
+    mime_type: str
+    file_size: int
+    page_count: int
+    chunk_count: int
+    sensitivity: str
+    status: str
+    approval_override: Optional[str] = None
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class DocumentUpdateRequest(BaseModel):
+    sensitivity: Optional[str] = Field(None, pattern=r"^(normal|sensitive|restricted)$")
+    approval_override: Optional[str] = Field(None, pattern=r"^(always|never)$")
+
+
+class DocumentBulkRequest(BaseModel):
+    document_ids: List[str]
+    action: str = Field(pattern=r"^(delete|update_sensitivity)$")
+    sensitivity: Optional[str] = None
+
+
+class DocumentBulkResponse(BaseModel):
+    affected: int
+
+
+class DocumentListResponse(BaseModel):
+    items: List[DocumentDetailResponse]
+    total: int
+
+
+class TenantPolicyResponse(BaseModel):
+    tenant_id: str
+    approval_mode: str
+    updated_at: Optional[datetime] = None
+    updated_by: Optional[str] = None
+
+
+class TenantPolicyUpdateRequest(BaseModel):
+    approval_mode: str = Field(pattern=r"^(all|sensitive|none)$")

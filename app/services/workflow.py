@@ -36,7 +36,7 @@ class WorkflowState(TypedDict, total=False):
     question: str
     tenant_id: str
     user_id: str
-    retrieved: List[Tuple[str, float, str, list]]
+    retrieved: List[Tuple[str, float, str, list, str]]
     draft_answer: str
     policy_blocked: bool
     policy_violations: List[str]
@@ -46,7 +46,9 @@ class WorkflowState(TypedDict, total=False):
     rewritten_query: str
     retrieval_attempts: int
     sub_questions: List[str]
-    all_contexts: List[Tuple[str, float, str, list]]
+    all_contexts: List[Tuple[str, float, str, list, str]]
+    # Source document IDs for approval policy
+    source_document_ids: List[str]
 
 
 def rewrite_node(state: WorkflowState) -> WorkflowState:
@@ -108,10 +110,14 @@ def retrieve_node(state: WorkflowState) -> WorkflowState:
         matches = search_chunks(query, settings.top_k, tenant_id)
         all_contexts = list(matches)
 
+    # Extract unique document IDs from retrieved chunks
+    doc_ids = list({m[4] for m in matches if len(m) > 4 and m[4]})
+
     return {
         "retrieved": matches,
         "retrieval_attempts": attempts + 1,
         "all_contexts": all_contexts,
+        "source_document_ids": doc_ids,
     }
 
 
@@ -155,8 +161,9 @@ def judge_node(state: WorkflowState) -> WorkflowState:
 def draft_node(state: WorkflowState) -> WorkflowState:
     """Generate an LLM answer from retrieved contexts, then run the
     output policy evaluator to check for sensitive patterns."""
-    contexts = [text for text, *_ in state.get("retrieved", [])]
-    sources = [source for _, _, source, *_ in state.get("retrieved", [])]
+    retrieved = state.get("retrieved", [])
+    contexts = [m[0] for m in retrieved]
+    sources = [m[2] for m in retrieved]
     raw_answer = generate_answer(state["question"], contexts, sources)
     policy_result = evaluate_output_policy(raw_answer)
     return {
@@ -195,10 +202,15 @@ def route_after_judge(state: WorkflowState) -> str:
 
 def route_after_draft(state: WorkflowState) -> str:
     """Conditional edge: skip approval when the policy blocked the answer
-    or when the approval feature is disabled."""
+    or when approval is not required per tenant/document policy."""
     if state.get("policy_blocked"):
         return "final"
-    return "approval" if settings.require_approval else "final"
+
+    from app.services.approval_policy import should_require_approval
+    doc_ids = state.get("source_document_ids", [])
+    if should_require_approval(state["tenant_id"], doc_ids):
+        return "approval"
+    return "final"
 
 
 # ── Build the LangGraph state graph ──────────────────────────────────────────

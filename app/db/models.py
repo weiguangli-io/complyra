@@ -104,3 +104,35 @@ class IngestJob(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    __table_args__ = (
+        Index("ix_documents_tenant_status", "tenant_id", "status"),
+        Index("ix_documents_tenant_sensitivity", "tenant_id", "sensitivity"),
+    )
+
+    document_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), ForeignKey("tenants.tenant_id"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    page_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sensitivity: Mapped[str] = mapped_column(String(32), nullable=False, default="normal")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    approval_override: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    storage_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(128), ForeignKey("users.user_id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+
+
+class TenantPolicy(Base):
+    __tablename__ = "tenant_policies"
+
+    tenant_id: Mapped[str] = mapped_column(String(128), ForeignKey("tenants.tenant_id"), primary_key=True)
+    approval_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="all")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    updated_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)

@@ -113,7 +113,7 @@ class TestSearchChunks:
 
         results = search_chunks("query", 4, "tenant1")
         assert len(results) == 1
-        assert results[0] == ("hello", 0.95, "doc.pdf", [1, 2])
+        assert results[0] == ("hello", 0.95, "doc.pdf", [1, 2], "")
 
     def test_handles_empty_payload(self, mock_qdrant, mock_embed):
         mock_qdrant.collection_exists.return_value = True
@@ -129,7 +129,7 @@ class TestSearchChunks:
         mock_qdrant.query_points.return_value = mock_response
 
         results = search_chunks("query", 4, "tenant1")
-        assert results[0] == ("", 0.5, "", [])
+        assert results[0] == ("", 0.5, "", [], "")
 
     def test_applies_tenant_filter(self, mock_qdrant, mock_embed):
         mock_qdrant.collection_exists.return_value = True

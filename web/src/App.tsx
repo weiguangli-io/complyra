@@ -16,26 +16,34 @@ import {
   getIngestJob,
   ingestFile,
   listDocuments,
+  listDocumentsV2,
   listTenants,
   listUsers,
   login,
-  logout
+  logout,
+  updateDocumentMeta,
+  bulkDocumentAction,
+  getDocumentPreviewUrl,
+  getTenantPolicy,
+  updateTenantPolicy
 } from "./api";
 import { detectLocale, type Locale, t } from "./i18n";
 import type {
   ApprovalResponse,
   AuditRecord,
+  DocumentDetail,
   DocumentInfo,
   IngestJobResponse,
   LogEntry,
   MetricsSummary,
   RetrievedChunk,
   Tenant,
+  TenantPolicy,
   UserAccount
 } from "./types";
 import "./styles.css";
 
-type Panel = "workbench" | "approvals" | "audit" | "admin" | "monitoring";
+type Panel = "workbench" | "approvals" | "audit" | "admin" | "monitoring" | "knowledgebase";
 
 type StatusMessage = {
   key: string;
@@ -47,7 +55,8 @@ const PANELS: Array<{ id: Panel; labelKey: string }> = [
   { id: "approvals", labelKey: "panel.approvals" },
   { id: "audit", labelKey: "panel.audit" },
   { id: "admin", labelKey: "panel.admin" },
-  { id: "monitoring", labelKey: "panel.monitoring" }
+  { id: "monitoring", labelKey: "panel.monitoring" },
+  { id: "knowledgebase", labelKey: "kb.title" }
 ];
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -87,6 +96,46 @@ const IconMonitor = () => (
   </svg>
 );
 
+const IconBook = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </svg>
+);
+
+const IconFilePdf = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="kb-file-icon">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <path d="M9 15h2a1 1 0 0 0 0-2H9v4" />
+    <path d="M15 13h-1v4h1a2 2 0 0 0 0-4z" />
+  </svg>
+);
+
+const IconFileImage = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="kb-file-icon">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+
+const IconFileText = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="kb-file-icon">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
+const getFileIcon = (mimeType: string) => {
+  if (mimeType === "application/pdf") return <IconFilePdf />;
+  if (mimeType.startsWith("image/")) return <IconFileImage />;
+  return <IconFileText />;
+};
+
 const IconLogo = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="12 2 2 7 12 12 22 7 12 2" />
@@ -100,7 +149,8 @@ const NAV_ICONS: Record<Panel, () => React.ReactElement> = {
   approvals: IconShield,
   audit: IconClipboard,
   admin: IconSettings,
-  monitoring: IconMonitor
+  monitoring: IconMonitor,
+  knowledgebase: IconBook
 };
 
 export default function App() {
@@ -158,6 +208,18 @@ export default function App() {
   const [monitorTab, setMonitorTab] = useState<"dashboard" | "logs" | "health">("dashboard");
   const [expandedLogIdx, setExpandedLogIdx] = useState<number | null>(null);
   const monitorTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Knowledge Base state
+  const [kbDocs, setKbDocs] = useState<DocumentDetail[]>([]);
+  const [kbTotal, setKbTotal] = useState(0);
+  const [kbFilter, setKbFilter] = useState({ status: "active", sensitivity: "" });
+  const [kbPage, setKbPage] = useState(0);
+  const [kbSelected, setKbSelected] = useState<Set<string>>(new Set());
+  const [kbPreview, setKbPreview] = useState<DocumentDetail | null>(null);
+  const [kbEditing, setKbEditing] = useState<DocumentDetail | null>(null);
+  const [kbEditSensitivity, setKbEditSensitivity] = useState("normal");
+  const [kbEditOverride, setKbEditOverride] = useState<string>("");
+  const [tenantPolicy, setTenantPolicy] = useState<TenantPolicy | null>(null);
 
   const isAuthenticated = useMemo(() => Boolean(token), [token]);
   const isAdmin = role === "admin";
@@ -554,6 +616,80 @@ export default function App() {
       monitorTimerRef.current = null;
     }
   }, [activePanel, monitorAutoRefresh, isAdmin, loadMonitoringData]);
+
+  // ── Knowledge Base data fetching ──────────────────────────
+  const loadKbData = useCallback(async () => {
+    if (!token || role !== "admin") return;
+    try {
+      const params: Record<string, string | number> = { limit: 20, offset: kbPage * 20 };
+      if (kbFilter.status && kbFilter.status !== "all") params.status = kbFilter.status;
+      if (kbFilter.sensitivity) params.sensitivity = kbFilter.sensitivity;
+      const res = await listDocumentsV2(tenantId, token, params);
+      setKbDocs(res.items);
+      setKbTotal(res.total);
+      const policy = await getTenantPolicy(tenantId, token);
+      setTenantPolicy(policy);
+    } catch { /* ignore */ }
+  }, [token, role, tenantId, kbPage, kbFilter]);
+
+  useEffect(() => { if (activePanel === "knowledgebase") loadKbData(); }, [activePanel, loadKbData]);
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const handleKbSelect = (docId: string) => {
+    setKbSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId); else next.add(docId);
+      return next;
+    });
+  };
+
+  const handleKbSelectAll = () => {
+    if (kbSelected.size === kbDocs.length) setKbSelected(new Set());
+    else setKbSelected(new Set(kbDocs.map(d => d.document_id)));
+  };
+
+  const handleKbBulkDelete = async () => {
+    if (!kbSelected.size) return;
+    await bulkDocumentAction(tenantId, { document_ids: [...kbSelected], action: "delete" }, token);
+    setKbSelected(new Set());
+    loadKbData();
+  };
+
+  const handleKbBulkSensitivity = async (sensitivity: string) => {
+    if (!kbSelected.size) return;
+    await bulkDocumentAction(tenantId, { document_ids: [...kbSelected], action: "update_sensitivity", sensitivity }, token);
+    setKbSelected(new Set());
+    loadKbData();
+  };
+
+  const handleKbEdit = (doc: DocumentDetail) => {
+    setKbEditing(doc);
+    setKbEditSensitivity(doc.sensitivity);
+    setKbEditOverride(doc.approval_override || "");
+  };
+
+  const handleKbSaveEdit = async () => {
+    if (!kbEditing) return;
+    const data: Record<string, string | null> = {};
+    if (kbEditSensitivity !== kbEditing.sensitivity) data.sensitivity = kbEditSensitivity;
+    if ((kbEditOverride || null) !== kbEditing.approval_override) data.approval_override = kbEditOverride || null;
+    await updateDocumentMeta(kbEditing.document_id, tenantId, data, token);
+    setKbEditing(null);
+    loadKbData();
+  };
+
+  const handlePolicySave = async (mode: string) => {
+    await updateTenantPolicy(tenantId, mode, token);
+    const policy = await getTenantPolicy(tenantId, token);
+    setTenantPolicy(policy);
+  };
 
   const panelTitle = PANELS.find((p) => p.id === activePanel);
   const isBusy = busyAction !== null;
@@ -1543,6 +1679,267 @@ export default function App() {
               )}
             </div>
           )}
+
+          {/* ── Knowledge Base ──────────────────────────────── */}
+          {activePanel === "knowledgebase" && role === "admin" && (() => {
+            const kbStatsActive = kbDocs.filter(d => d.status === "active").length;
+            const kbStatsSensitive = kbDocs.filter(d => d.sensitivity === "sensitive" || d.sensitivity === "restricted").length;
+            const kbStatsTotalChunks = kbDocs.reduce((sum, d) => sum + (d.chunk_count || 0), 0);
+            const kbPageSize = 20;
+            const kbTotalPages = Math.max(1, Math.ceil(kbTotal / kbPageSize));
+            const kbShowFrom = kbTotal === 0 ? 0 : kbPage * kbPageSize + 1;
+            const kbShowTo = Math.min((kbPage + 1) * kbPageSize, kbTotal);
+
+            return (
+            <div className="stack animate-in">
+              <h2 className="kb-page-title">{tt("kb.title")}</h2>
+
+              {/* Stats Cards */}
+              <div className="kb-stats-row">
+                <div className="kb-stat-card">
+                  <div className="kb-stat-label">{tt("kb.statsTotal")}</div>
+                  <div className="kb-stat-value">{kbTotal}</div>
+                </div>
+                <div className="kb-stat-card">
+                  <div className="kb-stat-label">{tt("kb.statsActive")}</div>
+                  <div className="kb-stat-value kb-stat-ok">{kbStatsActive}</div>
+                </div>
+                <div className="kb-stat-card">
+                  <div className="kb-stat-label">{tt("kb.statsSensitive")}</div>
+                  <div className="kb-stat-value kb-stat-warn">{kbStatsSensitive}</div>
+                </div>
+                <div className="kb-stat-card">
+                  <div className="kb-stat-label">{tt("kb.statsChunks")}</div>
+                  <div className="kb-stat-value">{kbStatsTotalChunks}</div>
+                </div>
+              </div>
+
+              {/* Approval Policy Card */}
+              <div className="card kb-policy-card">
+                <div className="kb-policy-header">
+                  <h3>{tt("kb.policy")}</h3>
+                  <p className="kb-policy-desc">{tt("kb.policyDesc")}</p>
+                </div>
+                <div className="kb-segmented-control">
+                  {(["all", "sensitive", "none"] as const).map(mode => (
+                    <button
+                      key={mode}
+                      className={`kb-segment${tenantPolicy?.approval_mode === mode ? " kb-segment-active" : ""}`}
+                      onClick={() => handlePolicySave(mode)}
+                    >
+                      <span className="kb-segment-label">{tt(`kb.policy${mode.charAt(0).toUpperCase() + mode.slice(1)}`)}</span>
+                      <span className="kb-segment-desc">{tt(`kb.policy${mode.charAt(0).toUpperCase() + mode.slice(1)}Desc`)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Toolbar: Filters + Bulk Actions */}
+              <div className="kb-toolbar">
+                <div className="kb-toolbar-filters">
+                  <div className="kb-filter-group">
+                    <label className="kb-filter-label">{tt("kb.filterStatus")}</label>
+                    <select className="kb-filter-select" value={kbFilter.status} onChange={e => { setKbFilter(f => ({ ...f, status: e.target.value })); setKbPage(0); }}>
+                      <option value="active">Active</option>
+                      <option value="archived">Archived</option>
+                      <option value="deleted">Deleted</option>
+                      <option value="all">All</option>
+                    </select>
+                  </div>
+                  <div className="kb-filter-group">
+                    <label className="kb-filter-label">{tt("kb.filterSensitivity")}</label>
+                    <select className="kb-filter-select" value={kbFilter.sensitivity} onChange={e => { setKbFilter(f => ({ ...f, sensitivity: e.target.value })); setKbPage(0); }}>
+                      <option value="">All</option>
+                      <option value="normal">{tt("kb.sensitivityNormal")}</option>
+                      <option value="sensitive">{tt("kb.sensitivitySensitive")}</option>
+                      <option value="restricted">{tt("kb.sensitivityRestricted")}</option>
+                    </select>
+                  </div>
+                </div>
+                {kbSelected.size > 0 && (
+                  <div className="kb-toolbar-bulk">
+                    <span className="kb-bulk-count">{kbSelected.size} {tt("kb.selected")}</span>
+                    <button className="btn-sm btn-danger" onClick={handleKbBulkDelete}>{tt("kb.bulkDelete")}</button>
+                    <select className="kb-filter-select" onChange={e => { if (e.target.value) handleKbBulkSensitivity(e.target.value); e.target.value = ""; }}>
+                      <option value="">{tt("kb.bulkSensitivity")}</option>
+                      <option value="normal">{tt("kb.sensitivityNormal")}</option>
+                      <option value="sensitive">{tt("kb.sensitivitySensitive")}</option>
+                      <option value="restricted">{tt("kb.sensitivityRestricted")}</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Document Table */}
+              {kbDocs.length === 0 ? (
+                <div className="kb-empty-state">
+                  <div className="kb-empty-icon">
+                    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="12" y="8" width="40" height="48" rx="4" />
+                      <path d="M22 24h20M22 32h20M22 40h12" />
+                      <circle cx="44" cy="44" r="10" fill="var(--bg-surface)" strokeWidth="2" />
+                      <path d="M41 44h6M44 41v6" strokeWidth="2" />
+                    </svg>
+                  </div>
+                  <h3 className="kb-empty-title">{tt("kb.emptyTitle")}</h3>
+                  <p className="kb-empty-desc">{tt("kb.emptyDesc")}</p>
+                </div>
+              ) : (
+                <div className="kb-table-wrapper">
+                  <table className="doc-table kb-doc-table">
+                    <thead>
+                      <tr>
+                        <th className="kb-col-check"><input type="checkbox" checked={kbSelected.size === kbDocs.length && kbDocs.length > 0} onChange={handleKbSelectAll} /></th>
+                        <th className="kb-col-filename">{tt("kb.documents")}</th>
+                        <th className="kb-col-size">{tt("kb.fileSize")}</th>
+                        <th className="kb-col-chunks">{tt("kb.chunks")}</th>
+                        <th>{tt("kb.sensitivity")}</th>
+                        <th>{tt("kb.approvalOverride")}</th>
+                        <th>{tt("kb.createdAt")}</th>
+                        <th className="kb-col-actions">{tt("kb.actions")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {kbDocs.map(doc => (
+                        <tr key={doc.document_id} className={`kb-row${kbSelected.has(doc.document_id) ? " kb-row-selected" : ""}`}>
+                          <td className="kb-col-check"><input type="checkbox" checked={kbSelected.has(doc.document_id)} onChange={() => handleKbSelect(doc.document_id)} /></td>
+                          <td className="kb-col-filename" title={doc.document_id}>
+                            <div className="kb-filename-cell">
+                              {getFileIcon(doc.mime_type)}
+                              <div className="kb-filename-text">
+                                <span className="kb-filename-name">{doc.filename}</span>
+                                <span className="kb-filename-type">{doc.mime_type.split("/")[1] || doc.mime_type}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="kb-col-size">{formatFileSize(doc.file_size)}</td>
+                          <td className="kb-col-chunks">{doc.chunk_count}</td>
+                          <td><span className={`sensitivity-badge sensitivity-${doc.sensitivity}`}>{tt(`kb.sensitivity${doc.sensitivity.charAt(0).toUpperCase() + doc.sensitivity.slice(1)}`)}</span></td>
+                          <td className="kb-col-override">{doc.approval_override ? tt(`kb.approval${doc.approval_override.charAt(0).toUpperCase() + doc.approval_override.slice(1)}`) : tt("kb.approvalDefault")}</td>
+                          <td className="kb-col-date">{new Date(doc.created_at).toLocaleDateString()}</td>
+                          <td className="kb-col-actions">
+                            <button className="ghost btn-sm" onClick={() => setKbPreview(doc)}>{tt("kb.preview")}</button>
+                            <button className="ghost btn-sm" onClick={() => handleKbEdit(doc)}>{tt("kb.edit")}</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {kbTotal > kbPageSize && (
+                <div className="kb-pagination">
+                  <span className="kb-pagination-info">{tt("kb.showingRange", { from: kbShowFrom, to: kbShowTo, total: kbTotal })}</span>
+                  <div className="kb-pagination-controls">
+                    <button className="ghost btn-sm" disabled={kbPage === 0} onClick={() => setKbPage(p => p - 1)}>&lsaquo;</button>
+                    {Array.from({ length: kbTotalPages }, (_, i) => i).map(i => {
+                      if (kbTotalPages <= 7 || i === 0 || i === kbTotalPages - 1 || Math.abs(i - kbPage) <= 1) {
+                        return (
+                          <button key={i} className={`btn-sm kb-page-btn${i === kbPage ? " kb-page-btn-active" : ""}`} onClick={() => setKbPage(i)}>
+                            {i + 1}
+                          </button>
+                        );
+                      }
+                      if (i === 1 && kbPage > 3) return <span key={i} className="kb-page-ellipsis">&hellip;</span>;
+                      if (i === kbTotalPages - 2 && kbPage < kbTotalPages - 4) return <span key={i} className="kb-page-ellipsis">&hellip;</span>;
+                      return null;
+                    })}
+                    <button className="ghost btn-sm" disabled={(kbPage + 1) * kbPageSize >= kbTotal} onClick={() => setKbPage(p => p + 1)}>&rsaquo;</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Modal */}
+              {kbPreview && (
+                <div className="modal-overlay" onClick={() => setKbPreview(null)}>
+                  <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header">
+                      <h3>{kbPreview.filename}</h3>
+                      <button className="ghost btn-sm" onClick={() => setKbPreview(null)}>{tt("kb.close")}</button>
+                    </div>
+                    <div className="kb-preview-meta">
+                      <div className="kb-preview-meta-item">
+                        {getFileIcon(kbPreview.mime_type)}
+                        <span>{kbPreview.mime_type.split("/")[1] || kbPreview.mime_type}</span>
+                      </div>
+                      <div className="kb-preview-meta-item">
+                        <span>{formatFileSize(kbPreview.file_size)}</span>
+                      </div>
+                      <div className="kb-preview-meta-item">
+                        <span>{kbPreview.page_count} {tt("kb.pageCount")}</span>
+                      </div>
+                      <span className={`sensitivity-badge sensitivity-${kbPreview.sensitivity}`}>
+                        {tt(`kb.sensitivity${kbPreview.sensitivity.charAt(0).toUpperCase() + kbPreview.sensitivity.slice(1)}`)}
+                      </span>
+                    </div>
+                    <div className="modal-body">
+                      {kbPreview.mime_type === "application/pdf" ? (
+                        <iframe
+                          src={`${getDocumentPreviewUrl(kbPreview.document_id, tenantId, token)}?token=${token}`}
+                          className="kb-preview-iframe"
+                          title={kbPreview.filename}
+                        />
+                      ) : kbPreview.mime_type.startsWith("image/") ? (
+                        <img
+                          src={`${getDocumentPreviewUrl(kbPreview.document_id, tenantId, token)}?token=${token}`}
+                          alt={kbPreview.filename}
+                          className="kb-preview-image"
+                        />
+                      ) : (
+                        <p className="kb-preview-unavailable">{tt("kb.previewNotAvailable")}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit Modal */}
+              {kbEditing && (
+                <div className="modal-overlay" onClick={() => setKbEditing(null)}>
+                  <div className="modal-content modal-sm" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header">
+                      <div className="kb-edit-header-info">
+                        {getFileIcon(kbEditing.mime_type)}
+                        <div>
+                          <h3>{kbEditing.filename}</h3>
+                          <span className="kb-edit-header-sub">{formatFileSize(kbEditing.file_size)} &middot; {kbEditing.mime_type.split("/")[1] || kbEditing.mime_type}</span>
+                        </div>
+                      </div>
+                      <button className="ghost btn-sm" onClick={() => setKbEditing(null)}>{tt("kb.close")}</button>
+                    </div>
+                    <div className="modal-body">
+                      <div className="kb-edit-section">
+                        <label>{tt("kb.sensitivity")}</label>
+                        <p className="kb-edit-field-desc">{tt("kb.editSensitivityDesc")}</p>
+                        <select value={kbEditSensitivity} onChange={e => setKbEditSensitivity(e.target.value)}>
+                          <option value="normal">{tt("kb.sensitivityNormal")}</option>
+                          <option value="sensitive">{tt("kb.sensitivitySensitive")}</option>
+                          <option value="restricted">{tt("kb.sensitivityRestricted")}</option>
+                        </select>
+                      </div>
+                      <div className="kb-edit-danger-zone">
+                        <h4 className="kb-danger-title">{tt("kb.dangerZone")}</h4>
+                        <p className="kb-edit-field-desc">{tt("kb.dangerZoneDesc")}</p>
+                        <label>{tt("kb.approvalOverride")}</label>
+                        <select value={kbEditOverride} onChange={e => setKbEditOverride(e.target.value)}>
+                          <option value="">{tt("kb.approvalDefault")}</option>
+                          <option value="always">{tt("kb.approvalAlways")}</option>
+                          <option value="never">{tt("kb.approvalNever")}</option>
+                        </select>
+                      </div>
+                      <div className="kb-edit-actions">
+                        <button className="ghost btn-sm" onClick={() => setKbEditing(null)}>{tt("kb.close")}</button>
+                        <button className="btn-primary btn-sm" onClick={handleKbSaveEdit}>{tt("kb.save")}</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            );
+          })()}
         </main>
       </div>
     </div>

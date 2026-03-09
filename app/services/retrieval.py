@@ -244,7 +244,7 @@ def delete_document(document_id: str, tenant_id: str) -> int:
 
 
 @traceable(name="search_chunks", run_type="retriever")
-def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, float, str, List[int]]]:
+def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, float, str, List[int], str]]:
     """Search for similar chunks in Qdrant.
 
     When hybrid search is enabled and the collection supports sparse vectors,
@@ -321,7 +321,7 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
         time.perf_counter() - search_start
     )
 
-    matches: List[Tuple[str, float, str, List[int]]] = []
+    matches: List[Tuple[str, float, str, List[int], str]] = []
     for res in results.points:
         payload = res.payload or {}
         matches.append((
@@ -329,6 +329,7 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
             res.score,
             payload.get("source", ""),
             payload.get("page_numbers", []),
+            payload.get("document_id", ""),
         ))
 
     RETRIEVAL_RESULTS_COUNT.observe(len(matches))

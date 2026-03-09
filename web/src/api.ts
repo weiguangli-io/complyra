@@ -3,17 +3,20 @@ import type {
   ApprovalResponse,
   AuditRecord,
   ChatResponse,
+  DocumentDetail,
   DocumentInfo,
+  DocumentListResponse,
   IngestJobResponse,
   IngestSubmitResponse,
   LogsResponse,
   MetricsSummary,
   Tenant,
+  TenantPolicy,
   TokenResponse,
   UserAccount
 } from "./types";
 
-const apiBase = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
+const apiBase = import.meta.env.VITE_API_BASE || "/api";
 
 const client = axios.create({
   baseURL: apiBase,
@@ -211,6 +214,72 @@ export async function fetchLogs(
 
 export async function fetchHealthCheck(token?: string | null): Promise<Record<string, unknown>> {
   const response = await client.get("/health/ready", { headers: authHeaders(token) });
+  return response.data;
+}
+
+/* ── Knowledge Base Management ────────────────────────── */
+
+export async function listDocumentsV2(
+  tenantId: string, token?: string | null,
+  params?: { status?: string; sensitivity?: string; limit?: number; offset?: number }
+): Promise<DocumentListResponse> {
+  const response = await client.get<DocumentListResponse>("/documents/", {
+    headers: { ...authHeaders(token), "X-Tenant-ID": tenantId },
+    params: params || {},
+  });
+  return response.data;
+}
+
+export async function getDocumentDetail(
+  documentId: string, tenantId: string, token?: string | null
+): Promise<DocumentDetail> {
+  const response = await client.get<DocumentDetail>(`/documents/${documentId}`, {
+    headers: { ...authHeaders(token), "X-Tenant-ID": tenantId },
+  });
+  return response.data;
+}
+
+export async function updateDocumentMeta(
+  documentId: string, tenantId: string,
+  data: { sensitivity?: string; approval_override?: string | null },
+  token?: string | null
+): Promise<DocumentDetail> {
+  const response = await client.patch<DocumentDetail>(`/documents/${documentId}`, data, {
+    headers: { ...authHeaders(token), "X-Tenant-ID": tenantId },
+  });
+  return response.data;
+}
+
+export async function bulkDocumentAction(
+  tenantId: string,
+  data: { document_ids: string[]; action: string; sensitivity?: string },
+  token?: string | null
+): Promise<{ affected: number }> {
+  const response = await client.post<{ affected: number }>("/documents/bulk", data, {
+    headers: { ...authHeaders(token), "X-Tenant-ID": tenantId },
+  });
+  return response.data;
+}
+
+export function getDocumentPreviewUrl(documentId: string, tenantId: string, token?: string | null): string {
+  return `${client.defaults.baseURL}/documents/${documentId}/preview`;
+}
+
+export async function getTenantPolicy(
+  tenantId: string, token?: string | null
+): Promise<TenantPolicy> {
+  const response = await client.get<TenantPolicy>(`/tenants/${tenantId}/policy`, {
+    headers: authHeaders(token),
+  });
+  return response.data;
+}
+
+export async function updateTenantPolicy(
+  tenantId: string, mode: string, token?: string | null
+): Promise<TenantPolicy> {
+  const response = await client.put<TenantPolicy>(`/tenants/${tenantId}/policy`, { approval_mode: mode }, {
+    headers: authHeaders(token),
+  });
   return response.data;
 }
 

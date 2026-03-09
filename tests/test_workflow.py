@@ -88,15 +88,15 @@ class TestRouteAfterDraft:
     def test_policy_blocked_goes_final(self):
         assert route_after_draft({"policy_blocked": True}) == "final"
 
-    @patch("app.services.workflow.settings")
-    def test_approval_required(self, mock_settings):
-        mock_settings.require_approval = True
-        assert route_after_draft({"policy_blocked": False}) == "approval"
+    @patch("app.services.approval_policy.should_require_approval", return_value=True)
+    def test_approval_required(self, mock_approval):
+        state = {"policy_blocked": False, "tenant_id": "t1", "source_document_ids": []}
+        assert route_after_draft(state) == "approval"
 
-    @patch("app.services.workflow.settings")
-    def test_no_approval_goes_final(self, mock_settings):
-        mock_settings.require_approval = False
-        assert route_after_draft({"policy_blocked": False}) == "final"
+    @patch("app.services.approval_policy.should_require_approval", return_value=False)
+    def test_no_approval_goes_final(self, mock_approval):
+        state = {"policy_blocked": False, "tenant_id": "t1", "source_document_ids": []}
+        assert route_after_draft(state) == "final"
 
 
 class TestRouteAfterJudge:

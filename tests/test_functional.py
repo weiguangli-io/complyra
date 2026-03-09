@@ -956,16 +956,16 @@ class TestTC11WorkflowRouting:
 
         assert route_after_draft({"policy_blocked": True}) == "final"
 
-    @patch("app.services.workflow.settings")
-    def test_tc11_07_route_after_draft_approval(self, mock_settings):
+    @patch("app.services.approval_policy.should_require_approval")
+    def test_tc11_07_route_after_draft_approval(self, mock_approval):
         """TC-11.07: Approval routing when enabled."""
         from app.services.workflow import route_after_draft
 
-        mock_settings.require_approval = True
-        assert route_after_draft({"policy_blocked": False}) == "approval"
+        mock_approval.return_value = True
+        assert route_after_draft({"policy_blocked": False, "tenant_id": "t1", "source_document_ids": []}) == "approval"
 
-        mock_settings.require_approval = False
-        assert route_after_draft({"policy_blocked": False}) == "final"
+        mock_approval.return_value = False
+        assert route_after_draft({"policy_blocked": False, "tenant_id": "t1", "source_document_ids": []}) == "final"
 
 
 # ════════════════════════════════════════════════════════════════════

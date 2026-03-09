@@ -37,6 +37,34 @@ export type DocumentInfo = {
   created_at: string;
 };
 
+export type DocumentDetail = {
+  document_id: string;
+  tenant_id: string;
+  filename: string;
+  mime_type: string;
+  file_size: number;
+  page_count: number;
+  chunk_count: number;
+  sensitivity: "normal" | "sensitive" | "restricted";
+  status: "active" | "archived" | "deleted";
+  approval_override: "always" | "never" | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocumentListResponse = {
+  items: DocumentDetail[];
+  total: number;
+};
+
+export type TenantPolicy = {
+  tenant_id: string;
+  approval_mode: "all" | "sensitive" | "none";
+  updated_at: string | null;
+  updated_by: string | null;
+};
+
 export type ChatResponse = {
   status: "pending_approval" | "completed";
   answer: string;

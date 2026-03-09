@@ -116,6 +116,7 @@ class Settings(BaseSettings):
     ingest_async_enabled: bool = True
     ingest_max_file_size_mb: int = 20
     ingest_storage_path: str = "./data/uploads"
+    document_preview_storage_path: str = "./data/previews"
     ingest_allowed_extensions: list[str] = ["pdf", "txt", "md", "png", "jpg", "jpeg"]
 
     # ── OCR ─────────────────────────────────────────────────────────
